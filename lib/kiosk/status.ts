@@ -11,6 +11,9 @@ export interface KioskStatus {
   state: KioskState;
   mode: KioskMode;
   muted: boolean;
+  /** Only the music / only the voice silenced (older mirrors do not send these). */
+  musicMuted?: boolean;
+  voiceMuted?: boolean;
   camera: string;
   /** People the pose tracker sees, and whether the closest one is framed head to shoes. */
   people: number;
@@ -44,6 +47,9 @@ export function buildKioskStatus(input: {
   session: SessionState;
   mode: KioskMode;
   muted: boolean;
+  /** Only the music / only the voice silenced (older mirrors do not send these). */
+  musicMuted?: boolean;
+  voiceMuted?: boolean;
   camera: string;
   people: number;
   framing: string;
@@ -55,6 +61,8 @@ export function buildKioskStatus(input: {
     state: input.state,
     mode: input.mode,
     muted: input.muted,
+    musicMuted: input.musicMuted,
+    voiceMuted: input.voiceMuted,
     camera: input.camera,
     people: input.people,
     framing: input.framing,

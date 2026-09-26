@@ -314,7 +314,7 @@ export interface CardResponse {
   entry: LeaderboardEntry | null;
 }
 
-export const REMOTE_COMMANDS = ["scan", "battle", "squad", "start", "wave", "reset", "mute", "mode"] as const;
+export const REMOTE_COMMANDS = ["scan", "battle", "squad", "start", "wave", "reset", "mute", "music", "voice", "mode"] as const;
 export type RemoteCommandName = (typeof REMOTE_COMMANDS)[number];
 
 export interface RemoteCommand {
@@ -375,6 +375,11 @@ export interface KioskSettings {
   textScale: number;
   printingEnabled: boolean;
   muted: boolean;
+  /** Master volume 0..1 (voice, music, effects), changed with the + / - keys. */
+  volume: number;
+  /** Silence just the music, or just the voice (admin MUTE MUSIC / MUTE VOICE); `muted` silences everything. */
+  musicMuted: boolean;
+  voiceMuted: boolean;
   performanceMode: boolean;
   /** Segmentation aura around the person (live feed + reveal photo). Off by default. */
   auraGlow: boolean;
@@ -398,6 +403,9 @@ export const DEFAULT_SETTINGS: KioskSettings = {
   textScale: 1,
   printingEnabled: false,
   muted: false,
+  volume: 0.8,
+  musicMuted: false,
+  voiceMuted: false,
   performanceMode: false,
   auraGlow: false,
   feedFit: "contain",

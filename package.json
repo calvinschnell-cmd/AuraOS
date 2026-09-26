@@ -13,11 +13,13 @@
     "ml": "powershell -NoProfile -ExecutionPolicy Bypass -File ml-service/run.ps1",
     "ml:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ml-service/setup.ps1",
     "db:setup": "tsx scripts/db-setup.ts",
+    "relay:check": "tsx scripts/relay-check.ts",
     "solana:setup": "tsx scripts/solana-setup.ts",
     "pose:collect": "ml-service\\pose\\.venv\\Scripts\\python ml-service/pose/collect.py",
     "pose:extract": "ml-service\\pose\\.venv\\Scripts\\python ml-service/pose/extract.py",
     "pose:train": "tsx scripts/pose-train.ts",
-    "kiosk:launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch-kiosk.ps1"
+    "kiosk:launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch-kiosk.ps1",
+    "demo:screens": "node scripts/demo-screens.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

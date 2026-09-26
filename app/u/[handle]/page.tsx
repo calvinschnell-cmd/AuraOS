@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AuraChart } from "@/components/charts/AuraChart";
+import { AppShell } from "@/components/companion/AppShell";
+import { DecodeNumber } from "@/components/companion/DecodeNumber";
 import { ShareProfile } from "@/components/companion/ShareProfile";
 import { EVENT_NAME, KIOSK_TIMEZONE } from "@/lib/config";
 import { formatAura } from "@/lib/scoring";
@@ -41,14 +43,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   const battles = cards.filter((c) => c.kind !== "scan");
 
   return (
-    <main className="companion aura-grid-bg">
-      <header className="top-bar">
-        <span className="font-heading text-[11px] uppercase tracking-[0.2em]">AURA OS · PROFILE</span>
-        <Link href="/feed" className="font-heading text-[10px] uppercase">
-          [LIVE FEED]
-        </Link>
-      </header>
-      <div className="companion__col">
+    <AppShell title="PROFILE" profileHandle={history.handle}>
         <div className="wordmark">
           <h1 className="wordmark__title font-heading uppercase">{history.name}</h1>
           <p className="wordmark__sub font-mono uppercase">AURA ID {history.handle}</p>
@@ -65,11 +60,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
           </div>
           <div>
             <dt className="font-heading">BEST</dt>
-            <dd className="font-number">{best ? formatAura(best.aura, true) : "—"}</dd>
+            <dd className="font-number">{best ? <DecodeNumber value={best.aura} signed /> : "—"}</dd>
           </div>
           <div>
             <dt className="font-heading">LATEST</dt>
-            <dd className="font-number">{latest ? formatAura(latest.aura, true) : "—"}</dd>
+            <dd className="font-number">{latest ? <DecodeNumber value={latest.aura} signed /> : "—"}</dd>
           </div>
         </dl>
 
@@ -79,8 +74,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
           <p className="companion__note">NO CARDS YET. SCAN AT THE MIRROR UNDER YOUR AURA ID, OR OPEN A CARD AND TAP “THIS WAS ME”.</p>
         ) : (
           <ol className="profile__cards">
-            {cards.map((c) => (
-              <li key={c.id}>
+            {cards.map((c, i) => (
+              <li key={c.id} className="rise" style={{ ["--i" as string]: Math.min(i, 8) }}>
                 <Link href={`/r/${c.id}`} className="profile__card">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={c.imageUrl} alt={c.title} loading="lazy" />
@@ -105,7 +100,6 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         <p className="companion__note">
           AURA OS · AURA BATTLES @ {EVENT_NAME}. CARDS YOU CLAIM STAY HERE AFTER THEY LEAVE THE LIVE FEED.
         </p>
-      </div>
-    </main>
+    </AppShell>
   );
 }

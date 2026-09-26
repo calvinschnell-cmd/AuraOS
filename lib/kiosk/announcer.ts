@@ -68,8 +68,15 @@ const PREFETCH_AHEAD = 2;
 
 export class Announcer {
   muted = false;
+  /** 0..1, the kiosk master volume (+ / - keys). */
+  private volume = 1;
   private queue: QueueItem[] = [];
   private speaking = false;
+  /** Nothing new starts before this time (an interlude such as the result jingle). */
+  private holdUntil = 0;
+  /** The item being spoken right now (an interlude waits for it to finish). */
+  private current: Promise<void> | null = null;
+  private busyListeners = new Set<(busy: boolean) => void>();
   private audio: HTMLAudioElement | null = null;
   private voice: SpeechSynthesisVoice | null = null;
 
@@ -117,6 +124,40 @@ export class Announcer {
     }
   }
 
+  setVolume(volume: number): void {
+    this.volume = Math.max(0, Math.min(1, volume));
+    if (this.audio) this.audio.volume = this.volume;
+  }
+
+  /** Called with true when the voice queue starts working, false once it is empty (music ducks under it). */
+  onBusyChange(listener: (busy: boolean) => void): () => void {
+    this.busyListeners.add(listener);
+    return () => this.busyListeners.delete(listener);
+  }
+
+  get busy(): boolean {
+    return this.speaking;
+  }
+
+  private setSpeaking(speaking: boolean): void {
+    if (this.speaking === speaking) return;
+    this.speaking = speaking;
+    for (const fn of this.busyListeners) fn(speaking);
+  }
+
+  /**
+   * Something else gets the floor (the result jingle): lines queued from now
+   * on wait, the line being spoken finishes first, then `run` plays and
+   * returns how long it lasts (ms, or null if nothing played). The queue
+   * resumes after it, so the voice never talks over it.
+   */
+  async interlude(run: () => number | null): Promise<void> {
+    this.holdUntil = Number.POSITIVE_INFINITY;
+    if (this.current) await Promise.race([this.current, sleep(8_000)]);
+    const ms = run();
+    this.holdUntil = ms ? Date.now() + ms + 200 : 0;
+  }
+
   stop(): void {
     // Anything synced to queued lines still happens (all at once), so nothing is left half revealed.
     const pending = this.queue;
@@ -128,7 +169,8 @@ export class Announcer {
     if (this.available) speechSynthesis.cancel();
     this.audio?.pause();
     this.audio = null;
-    this.speaking = false;
+    this.holdUntil = 0;
+    this.setSpeaking(false);
   }
 
   setMuted(muted: boolean): void {
@@ -137,14 +179,18 @@ export class Announcer {
   }
 
   private async drain(): Promise<void> {
-    this.speaking = true;
+    this.setSpeaking(true);
     while (this.queue.length > 0) {
-      const item = this.queue.shift()!;
+      while (Date.now() < this.holdUntil) await sleep(Math.min(100, this.holdUntil - Date.now()));
+      const item = this.queue.shift();
+      if (!item) break; // stop() emptied the queue during the hold
       this.prefetch();
       if (item.pauseMs) await sleep(item.pauseMs);
-      await this.speak(item);
+      this.current = this.speak(item);
+      await this.current;
+      this.current = null;
     }
-    this.speaking = false;
+    this.setSpeaking(false);
   }
 
   /** One queue item: its hooks around the clip, the browser voice, or (muted / voiceless) an estimated silence. */
@@ -191,6 +237,7 @@ export class Announcer {
     return new Promise((resolve) => {
       const url = URL.createObjectURL(clip);
       const audio = new Audio(url);
+      audio.volume = this.volume;
       this.audio = audio;
       let settled = false;
       const done = (played: boolean) => {
@@ -214,7 +261,7 @@ export class Announcer {
       if (this.voice) u.voice = this.voice;
       u.rate = 0.92;
       u.pitch = 0.72;
-      u.volume = 1;
+      u.volume = this.volume;
       u.onend = () => resolve();
       u.onerror = () => resolve();
       speechSynthesis.speak(u);

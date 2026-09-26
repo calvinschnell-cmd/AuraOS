@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { loadIdentity, saveIdentity, subscribeIdentity } from "@/lib/companion/identity";
 import { registerPlayer } from "@/lib/kiosk/api";
@@ -64,7 +65,7 @@ export function IdentityForm({ onDone, cta = "SAVE" }: { onDone: (p: PlayerInfo)
   );
 }
 
-/** Header chip: your AURA ID, or a prompt to set one. */
+/** Header chip: your AURA ID (switchable), or a one-line nudge to the JOIN tab. */
 export function IdentityBar() {
   const [player, setPlayer] = useIdentity();
   const [editing, setEditing] = useState(false);
@@ -80,9 +81,17 @@ export function IdentityBar() {
       </div>
     );
   }
+  if (!editing) {
+    return (
+      <Link href="/me" className="companion-bar companion-bar--cta">
+        <span>NAME YOURSELF ONCE: CARDS, STREAKS, YOUR PROFILE.</span>
+        <span className="companion-bar__go">GET YOUR AURA ID →</span>
+      </Link>
+    );
+  }
   return (
     <div className="companion-bar companion-bar--form">
-      <span>NAME YOURSELF ONCE. IT SHOWS ON CARDS AND THE LEADERBOARD.</span>
+      <span>SWITCH TO ANOTHER NAME OR AURA ID.</span>
       <IdentityForm
         onDone={(p) => {
           setPlayer(p);

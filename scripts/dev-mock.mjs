@@ -13,7 +13,7 @@ const env = {
   SOLANA_BADGES_ENABLED: "false",
   PRINTING_ENABLED: "false",
   ML_SERVICE_URL: "off",
-  AURA_DIST_DIR: ".next-mock",
+  AURA_DIST_DIR: process.env.AURA_DIST_DIR || ".next-mock",
 };
 
 const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--port", process.env.PORT ?? "3100"], { env, stdio: "inherit" });

@@ -8,6 +8,8 @@ import type { FeedDetail } from "@/lib/feed/types";
 import { historyPath } from "@/lib/players";
 import { formatAura } from "@/lib/scoring";
 import { beatThisLine } from "@/lib/share/caption";
+import { AppShell } from "./AppShell";
+import { DecodeNumber } from "./DecodeNumber";
 import { IdentityForm, useIdentity } from "./Identity";
 import { Reactions } from "./Reactions";
 
@@ -102,15 +104,7 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
   const canClaim = battle ? claimSlots.length > 0 : scan !== null && !scan.handle;
 
   return (
-    <main className="companion aura-grid-bg">
-      <header className="top-bar">
-        <span className="font-heading text-[11px] uppercase tracking-[0.2em]">AURA OS · {KIND_LABEL[entry.kind]}</span>
-        <Link href="/feed" className="font-heading text-[10px] uppercase">
-          [FEED]
-        </Link>
-      </header>
-
-      <div className="companion__col">
+    <AppShell title={KIND_LABEL[entry.kind]} tab="feed">
         <section className="os-window os-window--dark">
           <header className="os-window__title">
             <span>{entry.kind === "scan" ? "AURA_CARD.PNG" : entry.kind === "battle" ? "AURA_BATTLE_CARD.PNG" : "SQUAD_BATTLE_CARD.PNG"}</span>
@@ -129,7 +123,7 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
             <span>x</span>
           </header>
           <div className="os-window__body companion__cta">
-            <div className="companion__target font-number aura-text-glow">{formatAura(entry.target)}</div>
+            <DecodeNumber value={entry.target} className="companion__target font-number aura-text-glow" />
             <div className="font-heading text-xs uppercase">{beatThisLine(entry.target)}</div>
             {queued !== null ? (
               <p className="companion__note">
@@ -290,7 +284,6 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
         )}
 
         <p className="card-page__note">AURA OS · AURA BATTLES. PHOTOS ARE NEVER STORED, ONLY THIS FACE-BLURRED CARD.</p>
-      </div>
-    </main>
+    </AppShell>
   );
 }

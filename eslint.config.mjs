@@ -17,6 +17,7 @@ const eslintConfig = defineConfig([
     "ml-service/pose/.venv/**",
     // Mock-mode dev server build (scripts/dev-mock.mjs).
     ".next-mock/**",
+    ".next-demo/**",
   ]),
 ]);
 

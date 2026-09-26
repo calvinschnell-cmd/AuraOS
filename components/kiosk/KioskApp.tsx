@@ -13,6 +13,7 @@ import { captureLobby, createBattle, scoreCapture, streamCommentary, warmUp } fr
 import { isIdleState } from "@/lib/kiosk/machine";
 import type { PoseSnapshot } from "@/lib/pose/landmarks";
 import { MeltdownTracker } from "@/lib/kiosk/meltdown";
+import { useKioskMusic } from "@/lib/kiosk/music";
 import { useAudioAllowed, useSoundEngine } from "@/lib/kiosk/sound";
 import { CAMERA_ROTATIONS, type KioskEvent, type KioskMode, type RemoteCommandName, type ScreenSide, type UsageStats } from "@/lib/kiosk/types";
 import type { ModeChoice } from "./props";
@@ -37,6 +38,7 @@ import { judgesAnnouncement } from "./Judges";
 import { DigitalLayout } from "./DigitalLayout";
 import { MirrorLayout } from "./MirrorLayout";
 import type { KioskViewProps } from "./props";
+import { VolumeOsd } from "./VolumeOsd";
 
 const SULK_LINE = "The mirror is taking a break. Maybe try a double peace sign instead.";
 /** Keep the model connection warm between battles (idle gaps). */
@@ -176,9 +178,25 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
   }, []);
 
   // ---- announcer + sound
-  const announcer = useAnnouncer(settings.muted);
+  const announcer = useAnnouncer(settings.muted || settings.voiceMuted);
   const sound = useSoundEngine(settings.muted);
   const audioAllowed = useAudioAllowed(sound);
+  // Quiet background loop + result jingle; never under a voice line (lib/kiosk/music.ts).
+  const music = useKioskMusic({ sound, announcer, state, muted: settings.muted || settings.musicMuted, volume: settings.volume });
+  useEffect(() => {
+    announcer.setVolume(settings.volume);
+    sound.setVolume(settings.volume);
+  }, [announcer, sound, settings.volume]);
+  /** The result moment: the jingle (the voice waits for it), or the old impact sound without the file. */
+  const resultSting = useCallback(
+    (negative = false) => {
+      if (music.hasJingle) void announcer.interlude(() => music.playJingle());
+      else if (negative) sound.sad();
+      else sound.hit();
+    },
+    [music, announcer, sound],
+  );
+  const battleSound = useMemo(() => ({ hit: () => resultSting() }), [resultSting]);
   const leaderboard = useLeaderboard(5000, state !== "BOOT");
   // Challenger queue from shared cards ("BEAT THIS SCORE"), shown on the mode select.
   const challenges = useChallenges(isIdleState(state) || state === "READY");
@@ -193,7 +211,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
   }, [state, announcer, sound]);
 
   // Battle result out loud: the duel call + commentary, or the squad countdown (last place first).
-  useBattleAnnouncer({ state, session, announcer, sound, pickPrompt, send });
+  useBattleAnnouncer({ state, session, announcer, sound: battleSound, pickPrompt, send });
 
   const auraSpoken = useRef<string | null>(null);
   const verdictSpoken = useRef<string | null>(null);
@@ -202,8 +220,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
     const id = session.scan.id;
     if (reveal.state.auraChars >= reveal.timeline.auraText.length && auraSpoken.current !== id) {
       auraSpoken.current = id;
-      if (session.scan.aura < 0) sound.sad();
-      else sound.hit();
+      resultSting(session.scan.aura < 0);
       announcer.say(auraCallout(session.scan.aura), 450);
     }
     if (reveal.state.verdict && verdictSpoken.current !== id) {
@@ -211,7 +228,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
       announcer.sayPremium(judgesAnnouncement(session.scan.breakdown, session.scan.analysis.verdict));
       announcer.sayPremium([pickPrompt("resultActions")]);
     }
-  }, [reveal, session.scan, announcer, sound, pickPrompt]);
+  }, [reveal, session.scan, announcer, resultSting, pickPrompt]);
 
   useEffect(() => {
     if (session.roast) announcer.sayPremium([session.roast]);
@@ -259,6 +276,8 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
       session,
       mode,
       muted: settings.muted,
+      musicMuted: settings.musicMuted,
+      voiceMuted: settings.voiceMuted,
       camera: camera.status,
       people: gestures.debug.personCount,
       framing: gestures.debug.framing,
@@ -342,17 +361,38 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
         case "mute":
           updateSettings({ muted: !settings.muted });
           break;
+        case "music":
+          updateSettings({ musicMuted: !settings.musicMuted });
+          break;
+        case "voice":
+          updateSettings({ voiceMuted: !settings.voiceMuted });
+          break;
         case "mode":
           toggleMode();
           break;
       }
     },
-    [send, simulateWave, updateSettings, settings.muted, toggleMode],
+    [send, simulateWave, updateSettings, settings.muted, settings.musicMuted, settings.voiceMuted, toggleMode],
   );
   useRemote(onRemote);
 
+  // Master volume in 10% steps (+ / -); turning it up also unmutes. The readout flashes on each press.
+  const [volumeTick, setVolumeTick] = useState(0);
+  const nudgeVolume = useCallback(
+    (dir: 1 | -1) => {
+      const volume = Math.round(Math.max(0, Math.min(1, settings.volume + dir * 0.1)) * 10) / 10;
+      updateSettings(dir > 0 && settings.muted ? { volume, muted: false } : { volume });
+      setVolumeTick((t) => t + 1);
+    },
+    [settings.volume, settings.muted, updateSettings],
+  );
+
   const hotkeys = useMemo<HotkeyMap>(
     () => ({
+      "+": () => nudgeVolume(1),
+      "=": () => nudgeVolume(1),
+      "-": () => nudgeVolume(-1),
+      _: () => nudgeVolume(-1),
       Space: () => send({ type: "SCAN" }),
       W: simulateWave,
       // Aura Battles: B = 1v1 lobby, Q = squad lobby, V = two people at once, Enter = start.
@@ -383,7 +423,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
       },
       T: toggleMode,
     }),
-    [send, simulateWave, updateSettings, settings.muted, settings.cameraRotation, toggleMode, toggleFullscreen],
+    [send, simulateWave, updateSettings, settings.muted, settings.cameraRotation, toggleMode, toggleFullscreen, nudgeVolume],
   );
   // Operator hotkeys are off while a player types their leaderboard name.
   useHotkeys(hotkeys, state !== "NAME_ENTRY");
@@ -436,6 +476,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
     <>
       {mode === "mirror" ? <MirrorLayout key={machine.bootCount} {...view} /> : <DigitalLayout key={machine.bootCount} {...view} />}
       {curtainTick > 0 && <BootCurtain key={`curtain-${curtainTick}`} />}
+      {volumeTick > 0 && <VolumeOsd key={volumeTick} volume={settings.volume} muted={settings.muted} />}
       {!audioAllowed && !settings.muted && (
         <button type="button" className="sound-locked" onClick={() => sound.unlock()}>
           SOUND IS OFF: CLICK ANYWHERE OR PRESS ANY KEY

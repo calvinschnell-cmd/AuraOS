@@ -56,6 +56,12 @@ ml-service/pose/.venv/
 ml-service/pose/data/raw/
 ml-service/pose/models/
 /.next-mock/
+/.next-demo/
 
 # collector logs
 ml-service/pose/data/*.log
+
+# Kiosk music: third-party tracks, local to the kiosk laptop only (see public/audio/README.md)
+/public/audio/*.flac
+/public/audio/*.mp3
+/public/audio/*.ogg

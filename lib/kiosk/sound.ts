@@ -12,13 +12,24 @@ export class SoundEngine {
   private master: GainNode | null = null;
   private hum: { osc: OscillatorNode[]; gain: GainNode; filter: BiquadFilterNode; lfo: OscillatorNode } | null = null;
   private mutedFlag = false;
+  /** 0..1, the kiosk master volume (+ / - keys). */
+  private volume = 1;
+
+  private level(): number {
+    return this.mutedFlag ? 0 : 0.8 * this.volume;
+  }
+
+  /** The shared AudioContext (the kiosk music plays through it too). */
+  context(): AudioContext | null {
+    return this.ensure();
+  }
 
   private ensure(): AudioContext | null {
     if (typeof window === "undefined" || !("AudioContext" in window)) return null;
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.mutedFlag ? 0 : 0.8;
+      this.master.gain.value = this.level();
       this.master.connect(this.ctx.destination);
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
@@ -50,7 +61,12 @@ export class SoundEngine {
 
   setMuted(muted: boolean): void {
     this.mutedFlag = muted;
-    if (this.master && this.ctx) this.master.gain.setTargetAtTime(muted ? 0 : 0.8, this.ctx.currentTime, 0.05);
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 0.05);
+  }
+
+  setVolume(volume: number): void {
+    this.volume = Math.max(0, Math.min(1, volume));
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 0.05);
   }
 
   /** Low hum that rises while charging / analyzing. */

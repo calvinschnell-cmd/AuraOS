@@ -1,0 +1,139 @@
+{
+  "capturedAt": "2026-09-26T23:39:46.783Z",
+  "server": "MOCK MODE (in-memory, no API keys)",
+  "checks": [
+    {
+      "name": "/operator redirects to /admin",
+      "pass": true,
+      "detail": "/admin"
+    },
+    {
+      "name": "/remote redirects to /admin",
+      "pass": true,
+      "detail": "/admin"
+    },
+    {
+      "name": "CONTROLS button queues a command for the mirror",
+      "pass": true,
+      "detail": "commands after cursor: wave"
+    },
+    {
+      "name": "admin shows the mirror (status relayed)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "admin shows the line (walk-ins + BEAT THIS SCORE)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "admin shows the last call-up",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "admin shows the feed",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "admin shows OPEN MIRROR",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "STANDINGS → EDIT / DELETE lists every entry with a delete button",
+      "pass": true,
+      "detail": "3 rows"
+    },
+    {
+      "name": "phone QR opens full screen for judges",
+      "pass": true,
+      "detail": "WWW.AURAFULOS.TECH/FEED"
+    },
+    {
+      "name": "phone feed has the HOME link",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tab bar BOARD shows the standings",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "JOIN tab offers an AURA ID",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "HOME link on /leaderboard",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "HOME link on /r/[id]",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "HOME link on /pose-lab",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "HOME link on /admin",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no HOME link on the launcher itself",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "mirror hides HOME until the mouse moves",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "screens": [
+    {
+      "file": "admin-dashboard.png",
+      "what": "/admin: mirror status, OPEN MIRROR, controls (WAVE SENT), phone QR, sign-ups, stats, feed, standings"
+    },
+    {
+      "file": "admin-board-edit.png",
+      "what": "STANDINGS → EDIT / DELETE"
+    },
+    {
+      "file": "admin-judges-qr.png",
+      "what": "PHONE_QR → tap: full-screen QR to www.aurafulos.tech/feed"
+    },
+    {
+      "file": "phone-feed.png",
+      "what": "/feed on a phone: app bar, just scanned, tab bar (HOME · FEED · BOARD · JOIN)"
+    },
+    {
+      "file": "phone-board.png",
+      "what": "/feed?tab=standings (BOARD tab)"
+    },
+    {
+      "file": "phone-card.png",
+      "what": "/r/[id]: a card, BEAT THIS SCORE, share"
+    },
+    {
+      "file": "phone-join.png",
+      "what": "/me (JOIN tab): get an AURA ID"
+    },
+    {
+      "file": "launcher.png",
+      "what": "/ (where HOME goes)"
+    },
+    {
+      "file": "mirror-home-on-mouse-move.png",
+      "what": "/kiosk?mode=mirror (fake camera), HOME shown after a mouse move"
+    }
+  ]
+}

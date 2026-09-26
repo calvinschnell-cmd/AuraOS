@@ -34,6 +34,8 @@ export const viewport: Viewport = {
   themeColor: "#161616",
   width: "device-width",
   initialScale: 1,
+  // Phones: draw under the notch / home bar; the app shell pads with safe-area insets.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

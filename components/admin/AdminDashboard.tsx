@@ -33,6 +33,15 @@ const STATE_LABEL: Record<KioskState, string> = {
   SULKING: "SULKING (TOO MUCH WAVING)",
 };
 
+/** Toggle buttons say what pressing them will do, from what the mirror last reported. */
+function controlLabel(command: RemoteCommandName, label: string, status: KioskStatus | null): string {
+  if (!status) return label;
+  if (command === "mute") return status.muted ? "UNMUTE ALL" : label;
+  if (command === "music") return status.musicMuted ? "UNMUTE MUSIC" : label;
+  if (command === "voice") return status.voiceMuted ? "UNMUTE VOICE" : label;
+  return label;
+}
+
 /** Remote buttons: queued on the server, the mirror polls them. */
 const REMOTE_BUTTONS: { command: RemoteCommandName; label: string; emoji: string }[] = [
   { command: "battle", label: "AURA BATTLE", emoji: "⚔️" },
@@ -41,7 +50,9 @@ const REMOTE_BUTTONS: { command: RemoteCommandName; label: string; emoji: string
   { command: "start", label: "START BATTLE", emoji: "▶" },
   { command: "wave", label: "SIMULATE WAVE", emoji: "👋" },
   { command: "reset", label: "RESET", emoji: "↺" },
-  { command: "mute", label: "MUTE", emoji: "🔇" },
+  { command: "mute", label: "MUTE ALL", emoji: "🔇" },
+  { command: "music", label: "MUTE MUSIC", emoji: "🎵" },
+  { command: "voice", label: "MUTE VOICE", emoji: "🗣️" },
   { command: "mode", label: "MODE TOGGLE", emoji: "🪞" },
 ];
 
@@ -165,7 +176,11 @@ function MirrorNow({ status, now, adminKey }: { status: KioskStatus | null; now:
         </div>
         <div>
           <dt>VOICE</dt>
-          <dd className={status.muted ? "op-warn" : ""}>{status.muted ? "MUTED" : "ON"}</dd>
+          <dd className={status.muted || status.voiceMuted ? "op-warn" : ""}>{status.muted || status.voiceMuted ? "MUTED" : "ON"}</dd>
+        </div>
+        <div>
+          <dt>MUSIC</dt>
+          <dd className={status.muted || status.musicMuted ? "op-warn" : ""}>{status.muted || status.musicMuted ? "MUTED" : "ON"}</dd>
         </div>
         <div>
           <dt>MODE</dt>
@@ -424,6 +439,7 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
 
   const narrative = snapshot?.narrative ?? null;
   const u = stats.data;
+  const liveStatus = status.data?.status && now - status.data.status.at < KIOSK_STATUS_STALE_MS ? status.data.status : null;
   const phoneUrl = `${publicBaseUrl ?? window.location.origin}/feed`;
   return (
     <main className="op aura-grid-bg">
@@ -456,7 +472,10 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
             <div className="op-controls">
               {REMOTE_BUTTONS.map((b) => (
                 <button key={b.command} type="button" className="op-btn op-btn--big" onClick={() => void command(b.command)}>
-                  <span aria-hidden>{b.emoji}</span> {b.label}
+                  <span className="op-btn__emoji" aria-hidden>
+                    {b.emoji}
+                  </span>
+                  <span>{controlLabel(b.command, b.label, liveStatus)}</span>
                 </button>
               ))}
             </div>

@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { FEED_WINDOW_MS, type FeedEntry } from "@/lib/feed/types";
 import type { LeaderboardSnapshot } from "@/lib/kiosk/types";
 import { handleName, rivalryLine } from "@/lib/leaderboard/narrative";
 import { formatAura } from "@/lib/scoring";
+import { AppShell } from "./AppShell";
+import { DecodeNumber } from "./DecodeNumber";
 import { IdentityBar } from "./Identity";
 import { Reactions } from "./Reactions";
 
@@ -14,6 +17,8 @@ const HEADLINE_LABEL = { scan: "AURA", battle: "WON BY", squad: "GROUP AURA" } a
 /** New cards and standings show up without a refresh. */
 const FEED_POLL_MS = 8_000;
 const STANDINGS_POLL_MS = 10_000;
+/** Stagger for rows sliding in (capped so long lists do not wait). */
+const stagger = (i: number): CSSProperties => ({ "--i": Math.min(i, 8) }) as CSSProperties;
 
 export type FeedTab = "feed" | "standings";
 
@@ -45,7 +50,7 @@ function JustScanned({ entry, fresh }: { entry: FeedEntry; fresh: boolean }) {
         </div>
         <div className="feed-hero__score">
           <span className="font-heading">{HEADLINE_LABEL[entry.kind]}</span>
-          <span className="font-number">{formatAura(entry.headline)}</span>
+          <DecodeNumber value={entry.headline} className="font-number" />
         </div>
       </div>
       <Reactions cardId={entry.id} initial={entry.reactions} />
@@ -56,8 +61,8 @@ function JustScanned({ entry, fresh }: { entry: FeedEntry; fresh: boolean }) {
 function FeedList({ entries }: { entries: FeedEntry[] }) {
   return (
     <ol className="feed">
-      {entries.map((e) => (
-        <li key={e.id}>
+      {entries.map((e, i) => (
+        <li key={e.id} className="rise" style={stagger(i)}>
           <Link href={`/r/${e.id}`} className="feed__row">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={e.imageUrl} alt="" className="feed__thumb" loading="lazy" />
@@ -82,7 +87,18 @@ function FeedList({ entries }: { entries: FeedEntry[] }) {
 
 /** Live leaderboard: tap a row to open that player's card. */
 function Standings({ snapshot, squadCardId }: { snapshot: LeaderboardSnapshot | null; squadCardId: string | null }) {
-  if (!snapshot) return <p className="companion__note">LOADING THE STANDINGS...</p>;
+  if (!snapshot)
+    return (
+      <ol className="standings__list" aria-label="Loading the standings">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <li key={i} className="standings__row skeleton" style={stagger(i)}>
+            <span className="skeleton__block skeleton__block--rank" />
+            <span className="skeleton__block" />
+            <span className="skeleton__block skeleton__block--score" />
+          </li>
+        ))}
+      </ol>
+    );
   const { top, narrative } = snapshot;
   if (top.length === 0) return <p className="companion__note">NOBODY ON THE BOARD YET. SCAN AT THE MIRROR AND GIVE IT A THUMBS UP.</p>;
   const champ = narrative?.squadChampion ?? null;
@@ -122,7 +138,7 @@ function Standings({ snapshot, squadCardId }: { snapshot: LeaderboardSnapshot | 
               {href && <span className="standings__go" aria-hidden>›</span>}
             </>
           );
-          return <li key={e.id}>{href ? <Link href={href} className="standings__row">{body}</Link> : <div className="standings__row">{body}</div>}</li>;
+          return <li key={e.id} className="rise" style={stagger(i)}>{href ? <Link href={href} className="standings__row">{body}</Link> : <div className="standings__row">{body}</div>}</li>;
         })}
       </ol>
     </div>
@@ -132,15 +148,19 @@ function Standings({ snapshot, squadCardId }: { snapshot: LeaderboardSnapshot | 
 /**
  * The phone side of the mirror: the card that was just scanned (react to it
  * live), then every card (FEED) or the live leaderboard (STANDINGS), where a
- * tap opens that player's card. New cards appear on their own.
+ * tap opens that player's card. New cards appear on their own; scrolled down,
+ * a pill says so. The tab lives in the URL, so the tab bar's BOARD works too.
  */
 export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { initial: FeedEntry[]; initialNext: string | null; initialTab?: FeedTab }) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const tab: FeedTab = params ? (params.get("tab") === "standings" ? "standings" : "feed") : initialTab;
   const [entries, setEntries] = useState(initial);
   const [next, setNext] = useState(initialNext);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<FeedTab>(initialTab);
   const [standings, setStandings] = useState<LeaderboardSnapshot | null>(null);
   const [freshId, setFreshId] = useState<string | null>(null);
+  const [unseen, setUnseen] = useState(0);
 
   // New cards: merge the newest page in on top (keeps what was already loaded below).
   const entriesRef = useRef(entries);
@@ -157,12 +177,23 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
         if (added.length === 0) return;
         setFreshId(added[0].id);
         setEntries((old) => [...added.filter((a) => !old.some((o) => o.id === a.id)), ...old]);
+        if (window.scrollY > 240) setUnseen((n) => n + added.length);
       } catch {
         // offline: keep what we have
       }
     }, FEED_POLL_MS);
     return () => window.clearInterval(id);
   }, []);
+
+  // The pill goes away once you are back at the top.
+  useEffect(() => {
+    if (unseen === 0) return;
+    const onScroll = () => {
+      if (window.scrollY < 120) setUnseen(0);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [unseen]);
 
   useEffect(() => {
     if (tab !== "standings") return;
@@ -185,10 +216,7 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
     };
   }, [tab]);
 
-  const chooseTab = (t: FeedTab) => {
-    setTab(t);
-    window.history.replaceState(null, "", t === "feed" ? "/feed" : "/feed?tab=standings");
-  };
+  const chooseTab = (t: FeedTab) => router.replace(t === "feed" ? "/feed" : "/feed?tab=standings", { scroll: false });
 
   const more = useCallback(async () => {
     if (!next) return;
@@ -215,41 +243,56 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
   const squadCardId = champ ? (live.find((e) => e.battleId === champ.battleId && e.kind === "squad")?.id ?? null) : null;
 
   return (
-    <main className="companion aura-grid-bg">
-      <header className="top-bar">
-        <span className="font-heading text-[11px] uppercase tracking-[0.2em]">AURA OS · LIVE</span>
-        <Link href="/leaderboard" className="font-heading text-[10px] uppercase">
-          [BIG SCREEN]
+    <AppShell
+      title={tab === "feed" ? "LIVE" : "STANDINGS"}
+      tab={tab === "feed" ? "feed" : "board"}
+      action={
+        <Link href="/leaderboard" className="font-heading">
+          BIG SCREEN ↗
         </Link>
-      </header>
-      <div className="companion__col">
-        <div className="wordmark">
-          <h1 className="wordmark__title font-heading uppercase">AURA BATTLES</h1>
-          <p className="wordmark__sub font-mono uppercase">LIVE FROM THE MIRROR · HACKGT 13</p>
-        </div>
-        <IdentityBar />
-        {hero ? <JustScanned key={hero.id} entry={hero} fresh={hero.id === freshId} /> : <p className="companion__note">NOTHING IN THE LAST 30 MINUTES. SCAN AT THE MIRROR AND GIVE IT A THUMBS UP.</p>}
-        <div className="feed-tabs" role="tablist">
-          {(["feed", "standings"] as const).map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} className={`feed-tabs__tab font-heading ${tab === t ? "feed-tabs__tab--on" : ""}`} onClick={() => chooseTab(t)}>
-              {t === "feed" ? "FEED" : "STANDINGS"}
-            </button>
-          ))}
-        </div>
-        {tab === "feed" ? (
-          <>
-            <p className="companion__note">THE LAST 30 MINUTES AT THE MIRROR. TAP A CARD AND HIT “THIS WAS ME” TO KEEP IT ON YOUR PROFILE.</p>
-            <FeedList entries={rest} />
-            {next && (
-              <button type="button" className="card-page__button" onClick={more} disabled={loading}>
-                [{loading ? "LOADING..." : "LOAD MORE"}]
-              </button>
-            )}
-          </>
-        ) : (
-          <Standings snapshot={standings} squadCardId={squadCardId} />
-        )}
+      }
+    >
+      {unseen > 0 && (
+        <button type="button" className="new-pill font-heading" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+          ↑ {unseen} NEW {unseen === 1 ? "CARD" : "CARDS"}
+        </button>
+      )}
+      <div className="wordmark">
+        <h1 className="wordmark__title font-heading uppercase">AURA BATTLES</h1>
+        <p className="wordmark__sub wordmark__sub--caret font-mono uppercase">LIVE FROM THE MIRROR · HACKGT 13</p>
       </div>
-    </main>
+      <IdentityBar />
+      {tab === "standings" ? null : hero ? (
+        <JustScanned key={hero.id} entry={hero} fresh={hero.id === freshId} />
+      ) : (
+        <div className="empty-state">
+          <span className="empty-state__glyph font-number" aria-hidden>
+            [ _ ]
+          </span>
+          <p className="companion__note">NOTHING IN THE LAST 30 MINUTES. SCAN AT THE MIRROR AND GIVE IT A THUMBS UP.</p>
+        </div>
+      )}
+      <div className="feed-tabs" role="tablist">
+        <span className="feed-tabs__slider" style={{ transform: `translateX(${tab === "feed" ? 0 : 100}%)` }} aria-hidden />
+        {(["feed", "standings"] as const).map((t) => (
+          <button key={t} type="button" role="tab" aria-selected={tab === t} className={`feed-tabs__tab font-heading ${tab === t ? "feed-tabs__tab--on" : ""}`} onClick={() => chooseTab(t)}>
+            {t === "feed" ? "FEED" : "STANDINGS"}
+          </button>
+        ))}
+      </div>
+      {tab === "feed" ? (
+        <>
+          <p className="companion__note">THE LAST 30 MINUTES AT THE MIRROR. TAP A CARD AND HIT “THIS WAS ME” TO KEEP IT ON YOUR PROFILE.</p>
+          <FeedList entries={rest} />
+          {next && (
+            <button type="button" className="card-page__button" onClick={more} disabled={loading}>
+              [{loading ? "LOADING..." : "LOAD MORE"}]
+            </button>
+          )}
+        </>
+      ) : (
+        <Standings snapshot={standings} squadCardId={squadCardId} />
+      )}
+    </AppShell>
   );
 }

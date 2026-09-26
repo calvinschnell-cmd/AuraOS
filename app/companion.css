@@ -517,3 +517,408 @@ a.standings__row:active {
   min-height: 1em;
   font-size: 0.7rem;
 }
+
+/* ================================================================ app shell (phone)
+ * Sticky bar on top, tab bar at the bottom, safe-area aware. Motion is stepped
+ * (steps()) so it reads as pixels, never smooth-blurry; all of it turns off for
+ * prefers-reduced-motion.
+ */
+
+.app {
+  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+}
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: calc(2.5rem + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) max(0.9rem, env(safe-area-inset-right)) 0 max(0.9rem, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--aura-cyan);
+  background: color-mix(in srgb, var(--aura-bg) 96%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+}
+.app-bar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+.app-bar__dot {
+  width: 6px;
+  height: 6px;
+  background: var(--aura-glow);
+  box-shadow: 0 0 6px var(--aura-glow);
+  animation: live-blink 1.6s steps(2) infinite;
+}
+.app-bar__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+.app-bar__action a {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--aura-cyan) 50%, transparent);
+  font-size: 0.55rem;
+  white-space: nowrap;
+}
+.app-bar__action a:active {
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+
+.app-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--aura-cyan);
+  background: var(--aura-black);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.app-nav__bar {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 25%;
+  height: 3px;
+  background: var(--aura-glow);
+  box-shadow: 0 0 10px var(--aura-glow);
+  transition: transform 220ms steps(5, end);
+}
+.app-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 3.5rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  opacity: 0.55;
+  transition: opacity 120ms steps(2);
+  -webkit-tap-highlight-color: transparent;
+}
+.app-nav__item--on {
+  opacity: 1;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--aura-glow) 70%, transparent);
+}
+.app-nav__item:active {
+  background: color-mix(in srgb, var(--aura-cyan) 14%, transparent);
+}
+.app-nav__icon {
+  width: 14px;
+  height: 14px;
+}
+.app-nav__item--on .app-nav__icon {
+  filter: drop-shadow(0 0 4px var(--aura-glow));
+}
+
+/* the page boots in: each block wipes down in pixel steps, one after another */
+@keyframes boot-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+    opacity: 0.35;
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+.app .companion__col > * {
+  animation: boot-in 420ms steps(7, end) both;
+}
+.app .companion__col > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.app .companion__col > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.app .companion__col > :nth-child(4) {
+  animation-delay: 180ms;
+}
+.app .companion__col > :nth-child(5) {
+  animation-delay: 240ms;
+}
+.app .companion__col > :nth-child(n + 6) {
+  animation-delay: 300ms;
+}
+
+/* rows rise in, staggered by --i (set inline, capped) */
+@keyframes rise-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+.rise {
+  animation: rise-in 300ms steps(4, end) both;
+  animation-delay: calc(320ms + var(--i, 0) * 55ms);
+}
+
+/* blinking block cursor after the subtitle */
+.wordmark__sub--caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.3em;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: live-blink 1s steps(2) infinite;
+}
+
+/* tap feedback: a 1px press, like a hardware key */
+.feed__row,
+.standings__row,
+.profile__card,
+.companion__big-btn,
+.card-page__button,
+.feed-tabs__tab {
+  transition: transform 80ms steps(2), background-color 120ms steps(2), box-shadow 120ms steps(2);
+  -webkit-tap-highlight-color: transparent;
+}
+.feed__row:active,
+.profile__card:active,
+.companion__big-btn:active,
+.card-page__button:active {
+  transform: translate(1px, 1px);
+  box-shadow: inset 0 0 0 1px var(--aura-glow);
+}
+.feed__row:hover,
+.profile__card:hover {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--aura-cyan) 30%, transparent);
+}
+
+/* segmented tabs: the lit block slides; sticky under the app bar */
+.feed-tabs {
+  position: sticky;
+  top: calc(2.5rem + env(safe-area-inset-top));
+  z-index: 10;
+  background: var(--aura-bg);
+}
+.feed-tabs__slider {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 50%;
+  background: var(--aura-cyan);
+  transition: transform 200ms steps(4, end);
+}
+.feed-tabs__tab {
+  position: relative;
+  z-index: 1;
+  min-height: 2.75rem;
+}
+.feed-tabs__tab--on {
+  background: transparent;
+}
+
+/* reactions: bigger targets, a pixel pop and a floating +1 */
+.reactions__btn {
+  position: relative;
+  min-height: 2.5rem;
+}
+.reactions--compact .reactions__btn {
+  min-height: 2rem;
+  padding: 0.15rem 0.45rem;
+}
+@keyframes react-pop {
+  40% {
+    transform: scale(1.18);
+  }
+}
+.reactions__btn--pop {
+  animation: react-pop 240ms steps(3, end);
+}
+@keyframes plus-float {
+  from {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -1.6rem);
+    opacity: 0;
+  }
+}
+.reactions__plus {
+  position: absolute;
+  left: 50%;
+  top: -0.2rem;
+  font-size: 0.55rem;
+  color: var(--aura-glow);
+  text-shadow: 0 0 6px var(--aura-glow);
+  pointer-events: none;
+  animation: plus-float 700ms steps(7, end) forwards;
+}
+
+/* "new cards" pill, under the app bar */
+@keyframes pill-in {
+  from {
+    transform: translate(-50%, -120%);
+  }
+}
+.new-pill {
+  position: fixed;
+  top: calc(3.1rem + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 25;
+  transform: translateX(-50%);
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--aura-glow);
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--aura-cyan) 60%, transparent);
+  cursor: pointer;
+  animation: pill-in 240ms steps(4, end) both !important;
+}
+
+/* loading placeholders: blocks that blink in steps */
+@keyframes skeleton-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.skeleton__block {
+  display: block;
+  height: 0.9rem;
+  background: color-mix(in srgb, var(--aura-cyan) 22%, transparent);
+  animation: skeleton-blink 1.1s steps(2) infinite;
+}
+.skeleton__block--rank {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+.skeleton__block--score {
+  width: 4.5rem;
+  height: 1.2rem;
+}
+.standings__row.skeleton {
+  grid-template-columns: 2.2rem 1fr auto;
+}
+
+/* empty feed */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem 1rem;
+  border: 1px dashed color-mix(in srgb, var(--aura-cyan) 55%, transparent);
+  text-align: center;
+}
+.empty-state__glyph {
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--aura-glow);
+  animation: live-blink 1.4s steps(2) infinite;
+}
+
+/* /me: how it works */
+.me-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.me-steps__step {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--aura-cyan) 40%, transparent);
+  background: rgba(16, 16, 16, 0.85);
+}
+.me-steps__step > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.me-steps__n {
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--aura-glow);
+}
+.me-steps__title {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+}
+
+/* hero card: a slow scanline drifts over the card that was just scanned */
+.feed-hero__card {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+.feed-hero__card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 18%;
+  top: -18%;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--aura-glow) 16%, transparent), transparent);
+  animation: scan-drift 4.5s steps(30, end) infinite;
+  pointer-events: none;
+}
+@keyframes scan-drift {
+  to {
+    top: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app .companion__col > *,
+  .rise,
+  .new-pill,
+  .reactions__btn--pop,
+  .reactions__plus,
+  .feed-hero--fresh {
+    animation: none !important;
+  }
+  .feed-hero__card::after,
+  .wordmark__sub--caret::after,
+  .app-bar__dot,
+  .skeleton__block,
+  .empty-state__glyph,
+  .feed-hero__live {
+    animation: none;
+  }
+  .app-nav__bar,
+  .feed-tabs__slider {
+    transition: none;
+  }
+}
+
+/* identity nudge: one tappable line that opens the JOIN tab */
+.companion-bar--cta {
+  flex-wrap: nowrap;
+  text-decoration: none !important;
+}
+.companion-bar--cta > span:first-child {
+  opacity: 0.75;
+  line-height: 1.4;
+}
+.companion-bar__go {
+  flex-shrink: 0;
+  padding: 0.35rem 0.5rem;
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+.companion-bar--cta:active {
+  transform: translate(1px, 1px);
+}
