@@ -19,15 +19,52 @@ feed a phone companion site. Data lives in Tiger Data (TimescaleDB).
 | Screen | Where | What |
 | --- | --- | --- |
 | Mirror (user side) | kiosk laptop, portrait monitor, `http://localhost:3000/kiosk?mode=mirror` | The kiosk. Full screen in its own Chrome profile (`%LOCALAPPDATA%\AuraOS\chrome-mirror`). |
-| Admin | `http://localhost:3000/admin` on the laptop, or https://www.aurafulos.tech/admin from anywhere | The one admin page (`/operator` and `/remote` redirect here): mirror status (what's on screen, camera, people in frame), OPEN MIRROR, controls, sign-ups (walk-ins, CALL UP, remove), live feed, standings with EDIT / DELETE, today's stats, phone QR (tap → full screen for judges). Unlock with `ADMIN_KEY` (remembered in localStorage). Works the same from the public server: see "Kiosk relay" below. |
-| Phones | https://www.aurafulos.tech (also https://aurafulos.tech, https://155-138-165-43.sslip.io) | `/feed`: card just scanned (react live) + FEED (last 30 min) and STANDINGS (top 10, tap → card) tabs. `/r/[id]`: a card (react, BEAT THIS SCORE → queue, THIS WAS ME → claim). `/u/[handle]`: shareable profile (every card tied to the AURA ID). `/leaderboard`: big-screen Tide Chart (its QR opens `/feed?tab=standings`). |
+| Admin | `http://localhost:3000/admin` on the laptop, or https://www.aurafulos.tech/admin from anywhere | The one admin page (`/operator` and `/remote` redirect here): mirror status (what's on screen, camera, people in frame), OPEN MIRROR, controls, sign-ups (walk-ins, CALL UP, remove), live feed, standings with EDIT / DELETE, today's stats, phone QR (tap → full screen for judges). Controls include MUTE ALL, MUTE MUSIC and MUTE VOICE (labels flip to UNMUTE from the mirror's reported state). Unlock with `ADMIN_KEY` (remembered in localStorage). Works the same from the public server: see "Kiosk relay" below. |
+| Phones | https://www.aurafulos.tech (also https://aurafulos.tech, https://155-138-165-43.sslip.io) | An app shell (`components/companion/AppShell.tsx`): sticky top bar + bottom tab bar HOME · FEED · BOARD · ME (JOIN until you have an AURA ID). `/me`: get an AURA ID, or jumps to your profile. `/feed`: card just scanned (react live) + FEED (last 30 min) and STANDINGS (top 10, tap → card) tabs. `/r/[id]`: a card (react, BEAT THIS SCORE → queue, THIS WAS ME → claim). `/u/[handle]`: shareable profile (every card tied to the AURA ID). `/leaderboard`: big-screen Tide Chart (its QR opens `/feed?tab=standings`). |
 
 Launch both screens: `npm run kiosk:launch` (mirror on the portrait display,
 admin on the main one). `npm run kiosk:launch -- -MirrorOnly` reopens only
 the mirror; `-DryRun` prints the plan. The dashboard's OPEN MIRROR button runs
 the same launcher (`/api/operator/mirror`; refused while a mirror is reporting).
 Every page but the launcher has a HOME link bottom-left (on `/kiosk` and
-`/leaderboard` it only shows while the mouse moves).
+`/leaderboard` it only shows while the mouse moves; the phone pages use the tab
+bar's HOME instead).
+
+### Phone app look and motion
+
+Same AURA OS language (dark OS windows, cyan, Silkscreen/VT323, no rounded
+corners). Motion is stepped (`steps()`), in `app/companion.css` under "app
+shell": blocks wipe in top-down, rows stagger in (`.rise` + `--i`), aura numbers
+decode like a terminal (`DecodeNumber.tsx`), reactions pop with a floating +1,
+a "↑ N NEW CARDS" pill when cards arrive while scrolled down, blinking loading
+placeholders. Everything is off under `prefers-reduced-motion`. The feed tab
+lives in the URL (`?tab=standings`), so the tab bar's BOARD and the in-page
+tabs stay in sync.
+
+### Kiosk audio
+
+- Voice: `lib/kiosk/announcer.ts` (one queue; ElevenLabs clips or the browser
+  voice). Effects: `lib/kiosk/sound.ts` (Web Audio, synthesized).
+- Music: `lib/kiosk/music.ts`, mirror only. A quiet background loop
+  (`public/audio/kiosk-bg.flac`, loops 0:00 → 1:22 of a 1:32 track) and a result
+  jingle (`public/audio/result-jingle.flac`, 2.4 s). **These files are
+  third-party game music and are gitignored**: they exist only on the kiosk
+  laptop, never on GitHub or the public server (which returns 404 for them).
+  Without the files the kiosk is silent and falls back to the old hit/sad sounds.
+- Nothing overlaps: the loop fades out whenever the voice queue is busy, during
+  CHARGING / COUNTDOWN / ANALYZING / LOBBY_COUNTDOWN / BATTLE_INTRO, and during
+  the jingle; it returns 1.5 s after the voice goes quiet. The jingle plays on a
+  solo result (when the aura finishes typing) and on entering a battle result,
+  via `Announcer.interlude`: the line being spoken finishes, then the jingle,
+  then queued lines resume.
+- Volume: `+`/`=` and `-`/`_` on the kiosk change the master volume (voice,
+  music, effects) in 10% steps, with an on-screen bar (`VolumeOsd.tsx`); `+`
+  also unmutes. Saved in the kiosk settings (`volume`, `musicMuted`,
+  `voiceMuted` in `KioskSettings`); remote commands `music` / `voice` toggle the
+  last two.
+- `/music-lab`: developer page with the real engine: play, jump 5 s before the
+  loop point to hear the wrap, the jingle, and a full result (jingle → voice →
+  loop returns). Only has sound where the files exist (the laptop).
 
 ### Kiosk relay
 
@@ -59,6 +96,19 @@ QR codes use `PUBLIC_BASE_URL=https://www.aurafulos.tech` from `.env.local`.
   auto-renew is on at $29.99/yr. Vultr credit $100; destroy the instance after
   the event (stopped instances still bill).
 - Logs: `ssh ... journalctl -u aura -f`.
+
+## Checks and demo tooling
+
+- `npm run relay:check`: exercises the relay against the Tiger database in
+  `.env.local` (status, commands, the line, launch requests) and removes its
+  test rows.
+- `npm run demo:screens`: starts its own MOCK MODE server on :3200 with a
+  throwaway ADMIN_KEY, seeds it through the API, drives headless Chrome (muted)
+  and writes `docs/demo/screens/*.png` + `docs/demo/screens.json` (19 checks:
+  admin, relay display, board edits, judges QR, phone tabs, HOME links,
+  redirects). These are feature screenshots, **not** hackathon timeline proof.
+- `node scripts/dev-mock.mjs` (the `aura-os-mock` launch config, :3100) uses
+  the real `ADMIN_KEY` from `.env.local` unless one is passed in the env.
 
 ## Keys and config
 
@@ -114,6 +164,23 @@ server.
 4. Peace signs are read as "hand by the face" (body landmarks have no fingers);
    using the hand tracker's Victory gesture at capture time would be exact.
 5. Gemini judge availability (503 / timeouts from Google at last check).
+6. **Kiosk audio not yet heard on the real mirror.** The loop point was checked
+   in `/music-lab` (1:17 → 1:22 → wraps to 0:00), but the jingle → voice order
+   and the ducking have only been reasoned about and checked in the lab, not
+   heard end to end with the ElevenLabs voice. Levels (`BG_LEVEL` 0.12,
+   `JINGLE_LEVEL` 0.5) may need tuning in the room. Open question for the user:
+   jingle on battle results too, or solo scans only (currently both).
+7. OPEN MIRROR from the public `/admin` gives no feedback if the laptop server
+   is off (the request just expires after 30 s).
+8. **Hackathon timeline proof: undecided.** The user asked for proof that
+   everything was built after the event started. The evidence does not show
+   that: the project folder, `SPEC.md` and the Next.js scaffold were created
+   2026-09-22 ~04:30 local, Claude Code sessions for this project start
+   2026-09-22 08:34 UTC, and the first git commit (2026-09-25 21:10) adds ~42k
+   lines at once. Do not fabricate or alter timestamps, history or logs. Offered
+   instead: an accurate timeline of what the sources show, or (given the
+   official start time) a list of what was built after it, and/or disclosing
+   the pre-event spec/scaffold to the organizers.
 
 ## Gotchas (for whoever continues)
 
@@ -125,5 +192,10 @@ server.
   without running).
 - The dev server's cached store instance is rebuilt when the class changes
   (`getScanStore`), so new store methods work after hot reload.
-- Verify with `npm run lint`, `npm run typecheck`, `npm test` (200 tests), and
+- Shell edits: `node -e "..."` scripts and heredocs break on backticks and some
+  quotes (bash expands them); for multi-line code or CSS, use the Edit/Write
+  tools, or write the snippet to a file and append it.
+- `next dev` adds each dist dir it sees (`.next-mock`, `.next-demo`) to
+  `tsconfig.json` includes; eslint ignores them in `eslint.config.mjs`.
+- Verify with `npm run lint`, `npm run typecheck`, `npm test` (203 tests), and
   `npm run build` (don't build into `.next` while `next dev` is running).
