@@ -1,0 +1,4 @@
+# Pose classifier data pipeline (ml-service/pose). Separate venv from the segmenter.
+mediapipe==1.0.1
+numpy>=1.26
+pillow>=11

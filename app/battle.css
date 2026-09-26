@@ -1,0 +1,532 @@
+/* ================================================================ kiosk: Aura Battles screens
+ * Mode select, lobby, VS intro, result (hero number, per-mannequin stat
+ * columns, commentary). Built from the kiosk's existing pieces: OS windows,
+ * cyan accent + glow, Silkscreen / VT323 / Plex Mono, no rounded corners.
+ */
+
+/* ---- mode select */
+.mode-select {
+  width: min(94%, 34rem);
+}
+.mode-select__queue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.8rem;
+  margin-bottom: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px dashed var(--aura-glow);
+  font-size: 0.6rem;
+  color: var(--aura-glow);
+  animation: slot-blink 1.6s steps(2) infinite;
+}
+.mode-select__challenger .font-number {
+  font-size: 1rem;
+}
+.mode-select__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.6rem 0.5rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--aura-cyan);
+  cursor: pointer;
+  text-align: center;
+}
+.mode-btn:hover {
+  background: color-mix(in srgb, var(--aura-cyan) 18%, transparent);
+}
+/* Aura Battles is the headline mode: full width, bigger, lit. */
+.mode-btn--primary {
+  grid-column: 1 / -1;
+  padding: 0.9rem 0.5rem;
+  border: 2px solid var(--aura-glow);
+  background: color-mix(in srgb, var(--aura-cyan) 16%, transparent);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--aura-cyan) 45%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--aura-cyan) 25%, transparent);
+  animation: mode-pulse 2.4s ease-in-out infinite;
+}
+.mode-btn__emoji {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.mode-btn--primary .mode-btn__emoji {
+  font-size: 1.8rem;
+}
+.mode-btn__title {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+}
+.mode-btn--primary .mode-btn__title {
+  font-size: 1.35rem;
+  color: var(--aura-glow);
+  text-shadow: 0 0 10px var(--aura-cyan);
+}
+.mode-btn__sub {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+}
+.mode-btn--start {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-width: 2px;
+}
+.mode-btn--disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@keyframes mode-pulse {
+  50% {
+    box-shadow:
+      0 0 28px color-mix(in srgb, var(--aura-cyan) 70%, transparent),
+      inset 0 0 18px color-mix(in srgb, var(--aura-cyan) 35%, transparent);
+  }
+}
+
+/* ---- lobby */
+.lobby-window {
+  width: min(96%, 44rem);
+}
+.lobby__prompt {
+  font-size: 1.3rem;
+  text-align: center;
+  color: var(--aura-glow);
+  text-shadow: 0 0 10px var(--aura-cyan);
+}
+.lobby__sub {
+  min-height: 1em;
+  margin: 0.2rem 0 0.6rem;
+  font-size: 0.6rem;
+  text-align: center;
+  opacity: 0.8;
+}
+.lobby__slots {
+  display: grid;
+  gap: 0.5rem;
+  align-items: center;
+}
+.lobby__slots--duel {
+  grid-template-columns: 1fr auto 1fr;
+}
+.lobby__slots--squad {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.lobby-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.lobby-slot__photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border: 1px dashed color-mix(in srgb, var(--aura-cyan) 55%, transparent);
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.lobby__slots--duel .lobby-slot__photo {
+  max-height: 22vh;
+}
+.lobby-slot__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lobby-slot__empty {
+  font-size: 2.2rem;
+  opacity: 0.4;
+}
+.lobby-slot--up .lobby-slot__photo {
+  border: 2px solid var(--aura-glow);
+  animation: slot-blink 1s steps(2) infinite;
+}
+.lobby-slot--locked .lobby-slot__photo {
+  border: 2px solid var(--aura-cyan);
+  animation: lock-in 260ms steps(4) both;
+}
+.lobby-slot__label {
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+}
+.lobby-slot__status {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  opacity: 0.85;
+}
+.lobby__vs {
+  font-size: 3rem;
+  line-height: 1;
+  opacity: 0.35;
+  transform: scale(0.8);
+  transition:
+    opacity 300ms,
+    transform 300ms steps(4);
+}
+.lobby__vs--armed {
+  opacity: 1;
+  transform: scale(1.15);
+  color: var(--aura-glow);
+  text-shadow: 0 0 16px var(--aura-cyan);
+}
+.lobby__error {
+  margin-top: 0.5rem;
+  font-size: 0.6rem;
+  text-align: center;
+}
+@keyframes slot-blink {
+  50% {
+    border-color: transparent;
+  }
+}
+@keyframes lock-in {
+  from {
+    box-shadow: 0 0 34px var(--aura-glow);
+    border-color: var(--aura-glow);
+  }
+}
+/* The 3-2-1 stays readable above the lobby window. */
+.stage-overlays .countdown {
+  z-index: 4;
+}
+
+/* ---- VS intro (masks the last scoring under an animation) */
+.vs-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+.vs-intro__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  width: 100%;
+}
+.vs-intro__side {
+  display: flex;
+  flex: 1;
+  gap: 0.5rem;
+  animation: slide-in-left 500ms steps(6) both;
+}
+.vs-intro__side--left {
+  justify-content: flex-end;
+}
+.vs-intro__side--right {
+  animation-name: slide-in-right;
+}
+.vs-intro__thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: min(9rem, 16vw);
+  font-size: 0.55rem;
+}
+.vs-intro__thumb img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 2px solid var(--aura-cyan);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--aura-cyan) 45%, transparent);
+}
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-40%);
+    opacity: 0;
+  }
+}
+@keyframes slide-in-right {
+  from {
+    transform: translateX(40%);
+    opacity: 0;
+  }
+}
+.vs-intro__badge {
+  padding: 0.1em 0.3em 0;
+  border: 3px solid var(--aura-glow);
+  background: rgba(0, 0, 0, 0.7);
+  font-size: clamp(6rem, 20vw, 13rem);
+  line-height: 0.85;
+  color: var(--aura-glow);
+  text-shadow: 0 0 30px var(--aura-cyan);
+  animation: vs-slam 700ms cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.vs-intro__label {
+  font-size: 1.1rem;
+  letter-spacing: 0.3em;
+  animation: fade-up 400ms 300ms ease-out both;
+}
+.vs-intro__sub {
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+@keyframes vs-slam {
+  0% {
+    transform: scale(3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.92);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---- result: hero number */
+.battle-hero {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.9rem 0.4rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(10, 10, 10, 0.78);
+  pointer-events: none;
+  text-align: center;
+}
+.battle-hero__label {
+  font-size: 0.6rem;
+  letter-spacing: 0.25em;
+}
+.battle-hero__value {
+  font-size: clamp(3.5rem, 9vw, 6.5rem);
+  line-height: 0.85;
+  color: var(--aura-glow);
+}
+.battle-hero__line {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  animation: fade-up 300ms ease-out both;
+}
+.battle-hero--done .battle-hero__value {
+  animation: hero-pop 420ms steps(4) both;
+}
+@keyframes hero-pop {
+  50% {
+    transform: scale(1.08);
+    text-shadow: 0 0 40px var(--aura-glow);
+  }
+}
+
+/* ---- result: stat columns under each mannequin */
+.battle-strip {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 0;
+  pointer-events: none;
+}
+.battle-col {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.35rem 0.45rem;
+  transform: translateX(-50%);
+  border: 1px solid var(--aura-cyan);
+  background: rgba(10, 10, 10, 0.82);
+  color: var(--aura-cyan);
+  transition: opacity 400ms;
+}
+/* The winner's side pulses in the existing accent. */
+.battle-col--winner {
+  border: 2px solid var(--aura-glow);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--aura-cyan) 65%, transparent);
+  animation: winner-pulse 1.4s ease-in-out infinite;
+}
+.battle-col--other {
+  opacity: 0.7;
+}
+.battle-col__chips {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+.battle-col__label {
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+}
+.battle-col__winner,
+.battle-col__place {
+  padding: 0.05rem 0.35rem;
+  background: var(--aura-glow);
+  color: var(--aura-ink);
+  font-size: 0.5rem;
+  letter-spacing: 0.15em;
+}
+.battle-col__place {
+  background: transparent;
+  color: var(--aura-cyan);
+  border: 1px solid var(--aura-cyan);
+}
+.battle-col__nick {
+  overflow: hidden;
+  font-size: 0.55rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.battle-col__line {
+  font-size: 0.55rem;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+@keyframes winner-pulse {
+  50% {
+    box-shadow: 0 0 34px color-mix(in srgb, var(--aura-glow) 80%, transparent);
+  }
+}
+
+/* ---- squad countdown: places are called last to first */
+.battle-hero__callout {
+  margin-top: 0.15rem;
+  font-size: clamp(1.4rem, 3.4vw, 2.4rem);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--aura-glow);
+  animation: callout-in 380ms steps(5) both;
+}
+@keyframes callout-in {
+  from {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+/* Not called yet: sealed, stats hidden. */
+.battle-col--hidden {
+  border-style: dashed;
+  opacity: 0.55;
+}
+.battle-col__sealed {
+  padding: 0.6rem 0;
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  animation: sealed-blink 1.2s steps(2) infinite;
+}
+@keyframes sealed-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+/* Just called: slams in. */
+.battle-col--spotlight {
+  animation: spotlight-in 520ms steps(6) both;
+}
+.battle-col--spotlight.battle-col--winner {
+  animation:
+    spotlight-in 520ms steps(6) both,
+    winner-pulse 1.4s ease-in-out 520ms infinite;
+}
+@keyframes spotlight-in {
+  0% {
+    transform: translateX(-50%) scale(1.25);
+    box-shadow: 0 0 40px var(--aura-glow);
+    border-color: var(--aura-glow);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* ---- result: commentary */
+.commentary-window {
+  flex: 1;
+}
+.commentary__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.commentary__player {
+  font-size: 0.8rem;
+}
+.commentary__player .font-heading {
+  font-size: 0.6rem;
+}
+.commentary__stamp {
+  display: inline-block;
+  margin-top: 0.6rem;
+  padding: 0.15rem 0.5rem;
+  border: 2px solid var(--aura-glow);
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  transform: rotate(-3deg);
+  color: var(--aura-glow);
+}
+
+/* ---- mirror mode: everything lives in the left panel, no fills over the reflection */
+[data-mode="mirror"] .mode-btn,
+[data-mode="mirror"] .battle-col,
+[data-mode="mirror"] .battle-hero,
+[data-mode="mirror"] .lobby-slot__photo {
+  background: var(--aura-black);
+}
+[data-mode="mirror"] .kiosk-main__lower .battle-hero {
+  position: static;
+  transform: none;
+}
+[data-mode="mirror"] .lobby__slots--squad {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ---- /pose-lab (dev tool) */
+.pose-lab {
+  width: min(100%, 64rem);
+}
+.pose-lab__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+.pose-lab__video {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  background: #000;
+}
+.pose-lab__read {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pose-lab__score {
+  font-size: 6rem;
+  line-height: 0.85;
+}
+.pose-lab__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}

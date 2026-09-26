@@ -1,0 +1,283 @@
+/* ================================================================ companion app (/feed, /r/[id])
+ * Phone-first pages in the kiosk's visual language: grid desktop, dark OS
+ * windows with cyan borders, Silkscreen labels, VT323 numbers.
+ */
+
+.companion {
+  min-height: 100vh;
+  color: var(--aura-cyan);
+}
+.companion__col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: min(100%, 34rem);
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+}
+.companion .wordmark__title {
+  font-size: clamp(1.8rem, 9vw, 3rem);
+}
+.companion .card-page__img {
+  border-color: var(--aura-cyan);
+}
+.companion .card-page__button:hover {
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+.companion .card-page__actions {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.companion__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.companion__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  text-align: center;
+}
+.companion__target {
+  font-size: clamp(3.5rem, 18vw, 5.5rem);
+  line-height: 0.85;
+  color: var(--aura-glow);
+}
+.companion__big-btn {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--aura-glow);
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--aura-cyan) 55%, transparent);
+}
+.companion__big-btn:disabled {
+  opacity: 0.6;
+}
+.companion__note {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.companion__squad {
+  margin-bottom: 0.5rem;
+  font-size: 0.65rem;
+  line-height: 1.5;
+}
+.companion__players {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.companion__players li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--aura-cyan) 35%, transparent);
+  font-size: 0.65rem;
+}
+.companion__player--winner {
+  border-color: var(--aura-glow) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--aura-cyan) 45%, transparent);
+}
+.companion__nick {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+}
+.companion__stats {
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+.companion__line,
+.companion__commentary {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+.companion__commentary {
+  margin-top: 0.6rem;
+}
+.companion__handle {
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  text-decoration: underline;
+}
+.companion__children {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 0.6rem;
+}
+.companion__child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.55rem;
+}
+.companion__child img {
+  width: 100%;
+  border: 1px solid var(--aura-cyan);
+}
+.companion__share {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.companion__caption {
+  padding: 0.5rem;
+  border: 1px dashed var(--aura-cyan);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.companion__claim {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* identity */
+.companion-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(16, 16, 16, 0.8);
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+}
+.companion-bar a {
+  text-decoration: underline;
+}
+.companion-bar--form {
+  flex-direction: column;
+  align-items: stretch;
+}
+.companion-bar__link {
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  cursor: pointer;
+}
+.companion-id {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+}
+.companion-id__input {
+  flex: 1;
+  min-width: 10rem;
+  padding: 0.5rem;
+  border: 1px solid var(--aura-cyan);
+  background: var(--aura-black);
+  color: var(--aura-cyan);
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.companion-id__error {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+/* reactions */
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.reactions__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--aura-cyan);
+  font-family: var(--font-number);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.reactions__btn--mine {
+  background: color-mix(in srgb, var(--aura-cyan) 25%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--aura-cyan) 50%, transparent);
+}
+.reactions--compact {
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+}
+.reactions--compact .reactions__btn {
+  gap: 0.2rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85rem;
+}
+
+/* feed */
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.feed__row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.75rem;
+  padding: 0.6rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(16, 16, 16, 0.85);
+}
+.feed__thumb {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 1px solid var(--aura-cyan);
+}
+.feed__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.feed__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.55rem;
+  opacity: 0.8;
+}
+.feed__chip {
+  padding: 0 0.3rem;
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+.feed__title {
+  font-size: 0.7rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.feed__score {
+  font-size: 0.55rem;
+}
+.feed__score .font-number {
+  font-size: 1.8rem;
+  line-height: 0.9;
+  color: var(--aura-glow);
+}
+.feed__verdict {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  line-height: 1.35;
+}

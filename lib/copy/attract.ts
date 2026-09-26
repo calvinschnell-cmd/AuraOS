@@ -1,0 +1,10 @@
+/**
+ * ATTRACT LINES — REPLACE ME.
+ * Scrolled across the screen in ATTRACT mode after 60s with no person.
+ */
+export const ATTRACT_LINES: string[] = [
+  "WAVE IF YOU THINK YOUR FIT HAS AURA",
+  "AURA BATTLES ONLINE. STEP INTO FRAME.",
+  "UNAUTHORIZED DRIP IS STRICTLY MONITORED",
+  "TODAY'S TIDE CHART IS OPEN. CLAIM YOUR SPOT.",
+];

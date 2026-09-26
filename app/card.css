@@ -1,0 +1,355 @@
+/* ================================================================ share card (1080x1350, 4:5, rendered offscreen)
+ * One template for solo, battle and squad. The kiosk's own visual language:
+ * the #161616 grid desktop, an AURA OS window frame, cyan accent + glow,
+ * Silkscreen for labels and VT323 for numbers and verdicts (two faces only).
+ */
+
+.share-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 1080px;
+  height: 1350px;
+  overflow: hidden;
+  border: 3px solid var(--aura-cyan);
+  background-color: var(--aura-bg);
+  background-image:
+    linear-gradient(to right, var(--aura-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--aura-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--aura-cyan);
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+}
+.share-card__grain {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+  pointer-events: none;
+}
+.share-card__title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+  padding: 0 24px;
+  border-bottom: 3px solid var(--aura-cyan);
+  background: rgba(158, 231, 255, 0.14);
+  font-size: 24px;
+  letter-spacing: 0.08em;
+}
+.share-card__content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 40px 48px 24px;
+}
+.share-card__label {
+  font-size: 22px;
+  letter-spacing: 0.18em;
+  opacity: 0.8;
+}
+.share-card__small {
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+
+/* ---- hero number: large, glow behind it */
+.share-card__hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.share-card__hero-glow {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 760px;
+  height: 300px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(158, 231, 255, 0.32), rgba(158, 231, 255, 0.08) 60%, transparent);
+  pointer-events: none;
+}
+.share-card__hero-value {
+  position: relative;
+  font-family: var(--font-number);
+  /* 10 characters ("-1,000,000") still fit the column. */
+  font-size: calc(min(220px, 1150px / var(--chars, 7)));
+  line-height: 0.82;
+  color: var(--aura-glow);
+  text-shadow:
+    0 0 10px var(--aura-cyan),
+    0 0 36px rgba(158, 231, 255, 0.55);
+}
+.share-card__hero-sub {
+  position: relative;
+  font-size: 24px;
+  letter-spacing: 0.12em;
+}
+
+/* ---- photos */
+.share-card__photo {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border: 3px solid var(--aura-cyan);
+  background: #000;
+  overflow: hidden;
+}
+.share-card__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.share-card__photo--winner {
+  border-color: var(--aura-glow);
+  box-shadow:
+    0 0 0 3px var(--aura-glow),
+    0 0 44px rgba(158, 231, 255, 0.75);
+}
+.share-card__photo--dim img {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+.share-card__chip {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  background: var(--aura-glow);
+  color: var(--aura-ink);
+  font-size: 20px;
+  letter-spacing: 0.15em;
+}
+
+/* ---- solo */
+.share-card__solo {
+  display: grid;
+  grid-template-columns: 430px 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 32px 40px;
+  height: 100%;
+}
+.share-card__solo-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding-top: 20px;
+}
+.share-card__solo .share-card__hero-value {
+  font-size: calc(min(190px, 800px / var(--chars, 7)));
+}
+.share-card__nick {
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+}
+.share-card__mix {
+  font-family: var(--font-number);
+  font-size: 32px;
+  line-height: 1;
+  opacity: 0.9;
+}
+.share-card__icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.share-card__icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--aura-cyan);
+  font-family: var(--font-number);
+  font-size: 34px;
+  line-height: 1;
+}
+.share-card__verdict {
+  grid-column: 1 / -1;
+  align-self: center;
+  font-family: var(--font-number);
+  font-size: 50px;
+  line-height: 1.05;
+  text-transform: none;
+  color: var(--aura-glow);
+}
+.share-card__verdict--small {
+  font-size: 40px;
+  text-align: center;
+}
+
+/* ---- battle: split composition, VS badge, winner glow, gap as the hero number */
+.share-card__battle {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  height: 100%;
+}
+.share-card__battle .share-card__verdict {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.share-card__fighters {
+  display: grid;
+  grid-template-columns: 1fr 120px 1fr;
+  align-items: start;
+}
+.share-card__fighter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.share-card__fighter .share-card__photo {
+  width: 100%;
+  height: 420px;
+  aspect-ratio: auto;
+}
+.share-card__fighter-nick {
+  font-size: 22px;
+  line-height: 1.15;
+}
+.share-card__fighter-total {
+  font-family: var(--font-number);
+  font-size: 72px;
+  line-height: 0.85;
+}
+.share-card__fighter--winner .share-card__fighter-total {
+  color: var(--aura-glow);
+  text-shadow: 0 0 18px rgba(158, 231, 255, 0.7);
+}
+.share-card__vs {
+  align-self: center;
+  justify-self: center;
+  margin-top: -40px;
+  padding: 10px 8px 4px;
+  border: 3px solid var(--aura-glow);
+  background: var(--aura-bg);
+  font-family: var(--font-number);
+  font-size: 84px;
+  line-height: 0.8;
+  color: var(--aura-glow);
+  text-shadow: 0 0 20px var(--aura-cyan);
+}
+.share-card__battle .share-card__hero-value {
+  font-size: calc(min(170px, 1000px / var(--chars, 7)));
+}
+
+/* ---- squad: filmstrip across the top, group score as the hero */
+.share-card__squad {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  height: 100%;
+}
+.share-card__strip {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr));
+  gap: 18px;
+}
+.share-card__strip-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.share-card__strip-cell .share-card__photo {
+  width: 100%;
+  max-height: 420px;
+}
+.share-card__strip-total {
+  font-family: var(--font-number);
+  font-size: 44px;
+  line-height: 0.85;
+}
+.share-card__vibe {
+  text-align: center;
+  font-size: 40px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--aura-glow);
+}
+
+/* ---- footer: same position on every card (wordmark, "beat this score", QR) */
+.share-card__foot {
+  position: relative;
+  display: grid;
+  grid-template-columns: 250px 1fr 190px;
+  align-items: center;
+  gap: 28px;
+  height: 236px;
+  padding: 22px 32px;
+  border-top: 3px solid var(--aura-cyan);
+  background: rgba(0, 0, 0, 0.55);
+}
+.share-card__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.share-card__wordmark {
+  font-size: 46px;
+  white-space: nowrap;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--aura-cyan);
+}
+.share-card__brand-sub {
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+.share-card__cta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.share-card__cta-line {
+  font-size: 34px;
+  line-height: 1.1;
+  color: var(--aura-glow);
+}
+.share-card__cta-sub {
+  font-size: 22px;
+  letter-spacing: 0.14em;
+}
+.share-card__url {
+  font-family: var(--font-number);
+  font-size: 26px;
+  text-transform: none;
+  opacity: 0.8;
+  word-break: break-all;
+}
+.share-card__qr {
+  width: 190px;
+  height: 190px;
+  border: 3px solid var(--aura-cyan);
+  image-rendering: pixelated;
+}
+
+/* ---- /card-lab (dev tool): every card mode side by side at 40% */
+.card-lab {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  min-height: 100vh;
+  padding: 24px;
+}
+.card-lab__slot {
+  width: 432px;
+  height: 540px;
+  overflow: hidden;
+}
+.card-lab__slot .share-card {
+  transform: scale(0.4);
+  transform-origin: top left;
+}

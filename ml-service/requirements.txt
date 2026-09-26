@@ -1,0 +1,9 @@
+# torch and torchvision are NOT listed here: they must come from the CUDA wheel index
+# (setup.ps1 does this; transformers v5 image processors need torchvision):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# cu128+ is required for RTX 50-series (Blackwell, sm_120); it also covers the RTX 3060 (sm_86).
+transformers>=5.3,<6
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.20
+pillow>=11

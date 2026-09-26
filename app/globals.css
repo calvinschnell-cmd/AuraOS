@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@import "./kiosk.css";
+@import "./pages.css";
+@import "./card.css";
+@import "./battle.css";
+@import "./companion.css";
+
+/* ---------------------------------------------------------------- AURA OS tokens */
+:root {
+  --aura-bg: #161616;
+  --aura-grid: #222222;
+  --aura-cyan: #9ee7ff;
+  --aura-glow: #c8f4ff;
+  --aura-window: #f4f4f0;
+  --aura-titlebar: #d6d6d2;
+  --aura-ink: #111111;
+  --aura-black: #000000;
+  --aura-grid-size: 24px;
+}
+
+@theme inline {
+  --color-aura-bg: var(--aura-bg);
+  --color-aura-grid: var(--aura-grid);
+  --color-aura-cyan: var(--aura-cyan);
+  --color-aura-glow: var(--aura-glow);
+  --color-aura-window: var(--aura-window);
+  --color-aura-titlebar: var(--aura-titlebar);
+  --color-aura-ink: var(--aura-ink);
+  --color-aura-black: var(--aura-black);
+
+  /* Silkscreen: headings, logo, labels, buttons (all caps) */
+  --font-heading: var(--font-silkscreen), monospace;
+  /* VT323: large numbers such as the aura score */
+  --font-number: var(--font-vt323), monospace;
+  /* IBM Plex Mono: small text */
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-sans: var(--font-plex-mono), ui-monospace, monospace;
+
+  /* No rounded corners anywhere. */
+  --radius-*: initial;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--aura-bg);
+  color: var(--aura-cyan);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: none;
+  overflow-x: hidden;
+}
+
+/* Digital-mode desktop: dark background with a subtle 24px grid. */
+.aura-grid-bg {
+  background-color: var(--aura-bg);
+  background-image:
+    linear-gradient(to right, var(--aura-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--aura-grid) 1px, transparent 1px);
+  background-size: var(--aura-grid-size) var(--aura-grid-size);
+}
+
+/* Mirror mode: pure black, no grid, no gray, cyan-only UI. */
+[data-mode="mirror"] .aura-grid-bg,
+[data-mode="mirror"] body,
+[data-mode="mirror"] {
+  background-color: var(--aura-black);
+  background-image: none;
+}
+
+.aura-text-glow {
+  text-shadow:
+    0 0 4px var(--aura-glow),
+    0 0 12px color-mix(in srgb, var(--aura-cyan) 60%, transparent);
+}
+
+* {
+  border-radius: 0 !important;
+}

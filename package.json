@@ -1,0 +1,53 @@
+{
+  "name": "aura-os",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ml": "powershell -NoProfile -ExecutionPolicy Bypass -File ml-service/run.ps1",
+    "ml:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ml-service/setup.ps1",
+    "db:setup": "tsx scripts/db-setup.ts",
+    "solana:setup": "tsx scripts/solana-setup.ts",
+    "pose:collect": "ml-service\\pose\\.venv\\Scripts\\python ml-service/pose/collect.py",
+    "pose:extract": "ml-service\\pose\\.venv\\Scripts\\python ml-service/pose/extract.py",
+    "pose:train": "tsx scripts/pose-train.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.24.0",
+    "@mediapipe/tasks-vision": "^1.0.1",
+    "@metaplex-foundation/mpl-bubblegum": "^6.0.0",
+    "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
+    "@metaplex-foundation/umi": "^1.6.0",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.6.0",
+    "html-to-image": "^1.11.13",
+    "next": "16.3.5",
+    "openai": "^7.23.0",
+    "pg": "^8.23.0",
+    "qrcode": "^1.5.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "three": "^0.186.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24.13.6",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.186.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.1"
+  }
+}

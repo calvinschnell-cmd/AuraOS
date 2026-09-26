@@ -1,0 +1,1634 @@
+/* ================================================================ AURA OS kiosk */
+
+.kiosk-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  color: var(--aura-cyan);
+}
+.kiosk-root[data-mode="mirror"] {
+  background: var(--aura-black);
+}
+
+.camera-feed {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  /* Tailwind preflight caps <video> at max-width: 100%; the sideways box must exceed it. */
+  max-width: none;
+  object-fit: cover;
+  background: #000;
+  transform-origin: center;
+}
+/* A sideways-mounted camera: swap the box so the rotated video still covers the screen. */
+.camera-feed--sideways {
+  width: 100vh;
+  height: 100vw;
+}
+/* Whole frame visible: the sideways camera's long axis runs top to bottom, bars on the sides. */
+.camera-feed--contain {
+  object-fit: contain;
+}
+.camera-feed--hidden {
+  width: 2px;
+  height: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+.live-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  filter: blur(14px) brightness(1.3);
+  opacity: 0.75;
+  mix-blend-mode: screen;
+  transform-origin: center;
+}
+.landmark-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.landmark-overlay__bone {
+  stroke: var(--aura-glow);
+  stroke-width: 0.25;
+  vector-effect: non-scaling-stroke;
+}
+.landmark-overlay__joint {
+  fill: var(--aura-cyan);
+}
+.landmark-overlay__label {
+  fill: var(--aura-glow);
+  font-family: var(--font-mono);
+  font-size: 2px;
+  paint-order: stroke;
+  stroke: #000;
+  stroke-width: 0.4px;
+}
+/* Floats above the footer: holding a gesture must never resize the layout. */
+.gesture-ring {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 5.5rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms linear;
+}
+.gesture-ring--active {
+  opacity: 1;
+}
+.gesture-ring__svg {
+  width: 5.5rem;
+  height: 5.5rem;
+  transform: rotate(-90deg);
+}
+.gesture-ring__track {
+  fill: rgba(0, 0, 0, 0.55);
+  stroke: color-mix(in srgb, var(--aura-cyan) 30%, transparent);
+  stroke-width: 6;
+}
+[data-mode="mirror"] .gesture-ring__track {
+  fill: var(--aura-black);
+}
+.gesture-ring__fill {
+  fill: none;
+  stroke: var(--aura-glow);
+  stroke-width: 6;
+  stroke-linecap: butt;
+  filter: drop-shadow(0 0 4px var(--aura-cyan));
+}
+.gesture-ring__emoji {
+  position: absolute;
+  top: 1.55rem;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.gesture-ring__label {
+  margin-top: 0.15rem;
+  font-family: var(--font-heading);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.top-bar__button {
+  font-family: var(--font-heading);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.top-bar__button:hover {
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+
+/* ---- result reveal */
+.stage-overlays--result {
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+.reveal-photo-window {
+  width: min(48%, 24rem);
+}
+.reveal-panel-window {
+  flex: 1;
+  min-width: 0;
+}
+.reveal-photo-window .os-window__body {
+  padding: 0.35rem;
+  overflow: visible;
+}
+.reveal-photo {
+  position: relative;
+  width: 100%;
+  background: #000;
+}
+.reveal-photo__img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.reveal-photo__glow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  animation: glow-in 700ms ease-out both;
+}
+.reveal-photo__glow--outer {
+  z-index: 0;
+  transform: scale(1.12);
+  filter: blur(18px) brightness(1.4);
+  opacity: 0.95;
+}
+.reveal-photo__glow--inner {
+  z-index: 2;
+  filter: blur(7px);
+  mix-blend-mode: screen;
+  opacity: 0.4;
+}
+.reveal-box {
+  position: absolute;
+  z-index: 3;
+  border: 1px solid var(--aura-cyan);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 10px color-mix(in srgb, var(--aura-cyan) 55%, transparent);
+  animation: box-in 220ms steps(3) both;
+}
+.reveal-box--statement {
+  border-color: var(--aura-glow);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 16px var(--aura-cyan);
+}
+.reveal-box--held {
+  border-style: dashed;
+}
+.reveal-box__label {
+  position: absolute;
+  left: -1px;
+  top: -1.05rem;
+  max-width: 14rem;
+  padding: 0.1rem 0.3rem;
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+  font-family: var(--font-heading);
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-mode="mirror"] .reveal-box__label {
+  background: var(--aura-black);
+  color: var(--aura-cyan);
+  border: 1px solid var(--aura-cyan);
+}
+.reveal-photo__scanline {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--aura-glow);
+  box-shadow: 0 0 12px var(--aura-cyan);
+  animation: scan-sweep 1.4s linear infinite;
+  pointer-events: none;
+}
+.reveal-photo__badge {
+  position: absolute;
+  z-index: 4;
+  right: 0.3rem;
+  bottom: 0.3rem;
+  padding: 0.1rem 0.3rem;
+  background: rgba(0, 0, 0, 0.7);
+  font-family: var(--font-heading);
+  font-size: 0.5rem;
+  color: var(--aura-cyan);
+}
+.reveal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.reveal-panel__terminal {
+  font-size: 0.72rem;
+}
+.reveal-aura {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid currentColor;
+}
+.reveal-aura__label {
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
+}
+.reveal-aura__value {
+  font-size: clamp(3rem, 9vw, 5.5rem);
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+}
+.reveal-aura--negative .reveal-aura__value {
+  color: #ff5f7a;
+  text-shadow: 0 0 10px rgba(255, 95, 122, 0.6);
+}
+[data-mode="mirror"] .reveal-aura--negative .reveal-aura__value,
+[data-mode="mirror"] .reveal-aura--negative.mirror-aura .mirror-aura__value {
+  color: var(--aura-cyan);
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.reveal-aura--low .reveal-aura__value {
+  opacity: 0.85;
+}
+.reveal-aura--mid .reveal-aura__value {
+  color: var(--aura-cyan);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--aura-cyan) 60%, transparent);
+}
+.reveal-aura--high .reveal-aura__value {
+  color: var(--aura-glow);
+  text-shadow: 0 0 14px var(--aura-cyan);
+}
+.reveal-aura--max .reveal-aura__value {
+  color: #ffffff;
+  text-shadow: 0 0 10px var(--aura-glow), 0 0 28px var(--aura-cyan);
+}
+.reveal-aura--done .reveal-aura__value {
+  animation: aura-hit 320ms ease-out both;
+}
+.reveal-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  animation: fade-up 260ms ease-out both;
+}
+.reveal-mix__row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr 2.4rem;
+  align-items: center;
+  gap: 0.4rem;
+}
+.reveal-mix__name {
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reveal-mix__track {
+  height: 8px;
+  border: 1px solid currentColor;
+}
+.reveal-mix__fill {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  animation: bar-grow 700ms ease-out both;
+  transform-origin: left;
+}
+.reveal-mix__pct {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-align: right;
+}
+.reveal-grid {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.15rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+.reveal-grid dt {
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  align-self: center;
+}
+.reveal-grid__row {
+  display: contents;
+}
+.reveal-grid__row--hot dt,
+.reveal-grid__row--hot dd {
+  color: var(--aura-glow);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--aura-cyan) 60%, transparent);
+}
+/* Battle columns: the same stat rows at a smaller scale. */
+.reveal-grid--compact {
+  grid-template-columns: auto 1fr;
+  gap: 0.05rem 0.4rem;
+  font-size: 0.62rem;
+}
+.reveal-grid--compact dt {
+  font-size: 0.48rem;
+}
+.reveal-grid--compact dd {
+  text-align: right;
+}
+.reveal-pts {
+  margin-left: 0.4rem;
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  opacity: 0.85;
+}
+.reveal-pts--neg {
+  opacity: 0.6;
+}
+.reveal-mods {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+.reveal-mod {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+  animation: fade-up 220ms ease-out both;
+}
+.reveal-mod__tier {
+  font-family: var(--font-heading);
+  font-size: 0.5rem;
+  opacity: 0.7;
+}
+.reveal-mod--legendary .reveal-mod__label {
+  text-shadow: 0 0 8px currentColor;
+}
+.reveal-mod--penalty {
+  opacity: 0.7;
+}
+.reveal-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  font-family: var(--font-heading);
+  animation: fade-up 260ms ease-out both;
+}
+.reveal-rank__nick {
+  font-size: 0.7rem;
+}
+.reveal-rank__pos {
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+.reveal-verdict {
+  font-family: var(--font-heading);
+  font-size: clamp(0.9rem, 2.2vw, 1.3rem);
+  line-height: 1.25;
+  text-align: center;
+  text-transform: uppercase;
+  animation: fade-up 320ms ease-out both;
+}
+/* ---- two judges (GPT + Gemini) */
+.judges {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: fade-up 320ms ease-out both;
+}
+.judges__banner {
+  padding: 0.4rem 0.5rem;
+  border: 2px solid #ff5f7a;
+  background: #ff5f7a;
+  color: #000;
+  font-family: var(--font-heading);
+  font-size: clamp(1rem, 2.6vw, 1.6rem);
+  letter-spacing: 0.08em;
+  text-align: center;
+  animation:
+    judges-flash 0.5s steps(2) 6,
+    judges-shake 0.4s ease-in-out 2;
+}
+@keyframes judges-flash {
+  50% {
+    background: #000;
+    color: #ff5f7a;
+  }
+}
+@keyframes judges-shake {
+  25% {
+    transform: translateX(-4px) rotate(-1deg);
+  }
+  75% {
+    transform: translateX(4px) rotate(1deg);
+  }
+}
+.judges__agree {
+  font-family: var(--font-heading);
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-align: center;
+  opacity: 0.8;
+}
+.judges__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.judge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.45rem;
+  border: 1px solid currentColor;
+}
+.judges--disagree .judge {
+  border-color: #ff5f7a;
+}
+.judge__name {
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+}
+.judge__aura {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  line-height: 0.9;
+}
+.judge__aura--negative {
+  color: #ff5f7a;
+}
+.judge__aura--high,
+.judge__aura--max {
+  color: var(--aura-glow);
+  text-shadow: 0 0 10px var(--aura-cyan);
+}
+.judge__meta {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  opacity: 0.8;
+}
+.judge__verdict {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+.judges__official,
+.judges__solo {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+  opacity: 0.8;
+}
+/* Mirror: cyan only. The banner flashes inverted cyan so it reads through the glass. */
+[data-mode="mirror"] .judges__banner {
+  border-color: var(--aura-cyan);
+  background: var(--aura-cyan);
+  color: var(--aura-black);
+}
+[data-mode="mirror"] .judges--disagree .judge {
+  border-color: var(--aura-cyan);
+}
+[data-mode="mirror"] .judge__aura--negative {
+  color: var(--aura-cyan);
+  text-decoration: line-through;
+}
+@keyframes judges-flash-mirror {
+  50% {
+    background: var(--aura-black);
+    color: var(--aura-cyan);
+  }
+}
+[data-mode="mirror"] .judges__banner {
+  animation:
+    judges-flash-mirror 0.5s steps(2) 6,
+    judges-shake 0.4s ease-in-out 2;
+}
+
+.reveal-foot {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  opacity: 0.55;
+}
+@keyframes glow-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes box-in {
+  from {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes scan-sweep {
+  from {
+    top: 0;
+  }
+  to {
+    top: 100%;
+  }
+}
+@keyframes aura-hit {
+  0% {
+    transform: scale(1.25);
+  }
+  60% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes fade-up {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.kiosk-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+  opacity: 0.6;
+}
+
+.kiosk-chrome {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---- top bar */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 1.75rem;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--aura-cyan);
+  background: rgba(22, 22, 22, 0.85);
+  color: var(--aura-cyan);
+}
+[data-mode="mirror"] .top-bar {
+  background: var(--aura-black);
+}
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: #555;
+}
+.live-dot--on {
+  background: var(--aura-glow);
+  box-shadow: 0 0 6px var(--aura-glow);
+  animation: blink 1.4s steps(1) infinite;
+}
+
+/* ---- main grid: landscape = stage + side column; portrait = stacked */
+.kiosk-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head head"
+    "stage side"
+    "foot foot";
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+/*
+ * Mirror: the display sits in the top-left of the mirror, so the person's
+ * reflection covers the right of the screen. All UI stacks in a left panel
+ * (--mirror-panel, from settings); the rest stays pure black = clean mirror.
+ * Stacked in any orientation, since the panel is always tall and narrow.
+ */
+[data-mode="mirror"] .kiosk-chrome {
+  width: var(--mirror-panel, 45%);
+  /* Children size to the panel (cqi), not the whole screen. */
+  container-type: inline-size;
+}
+/* Wordmark above the aura: side by side does not fit the narrow panel. */
+.kiosk-main--mirror .kiosk-main__head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+.kiosk-main--mirror .mirror-aura {
+  align-self: stretch;
+  align-items: flex-start;
+}
+/* Up to "-1,000,000" (VT323 digits ~0.4em) must fit the panel width. */
+.kiosk-main--mirror .mirror-aura__value {
+  font-size: min(8rem, 22cqi);
+}
+/* The top bar wraps into two tidy rows instead of overflowing. */
+[data-mode="mirror"] .top-bar {
+  flex-wrap: wrap;
+  height: auto;
+  row-gap: 0.15rem;
+  padding: 0.25rem 0.75rem;
+}
+[data-mode="mirror"] .kiosk-footer {
+  height: auto;
+  min-height: 1.4rem;
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding: 0.15rem 0.75rem;
+}
+.kiosk-main--mirror,
+.kiosk-main.kiosk-main--mirror {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas:
+    "head"
+    "stage"
+    "lower"
+    "side"
+    "foot";
+}
+.kiosk-main--mirror .kiosk-main__side {
+  max-height: 24vh;
+}
+/* Bigger mirror text must never push a window past the panel into the reflection. */
+[data-mode="mirror"] .kiosk-chrome .os-window {
+  max-width: 100%;
+}
+.kiosk-main--mirror .kiosk-main__lower {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+/* Results: the guy keeps the left half of the stage, the capture sits on the right. */
+.kiosk-main__stage--split .mannequin-view--mirror {
+  right: 50%;
+}
+/* Scoped to the stage so it outranks .os-window's position: relative (declared later). */
+.kiosk-main__stage .mirror-stage-photo {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 50%;
+  max-height: 100%;
+  overflow: hidden;
+}
+@media (orientation: portrait) {
+  .kiosk-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1.4fr) minmax(0, 0.7fr) auto;
+    grid-template-areas:
+      "head"
+      "stage"
+      "side"
+      "foot";
+  }
+
+}
+.kiosk-main__head {
+  grid-area: head;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.kiosk-main__stage {
+  grid-area: stage;
+  position: relative;
+  min-height: 0;
+}
+.kiosk-main__side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+.kiosk-main__lower {
+  grid-area: lower;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+}
+.kiosk-main__foot {
+  grid-area: foot;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ---- wordmark */
+.wordmark__title {
+  font-size: clamp(1.6rem, 5vw, 3.6rem);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--aura-cyan);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--aura-cyan) 45%, transparent);
+}
+.wordmark__sub {
+  margin-top: 0.35rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  opacity: 0.8;
+}
+.wordmark--compact .wordmark__title {
+  font-size: clamp(1.2rem, 3.5vw, 2.2rem);
+}
+
+/* ---- OS windows */
+.os-window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--aura-ink);
+  background: var(--aura-window);
+  color: var(--aura-ink);
+  box-shadow:
+    inset 1px 1px 0 #ffffff,
+    inset -1px -1px 0 #b9b9b4,
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+.os-window--open {
+  animation: os-open 180ms steps(5) both;
+  transform-origin: top left;
+}
+.os-window__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  height: 1.35rem;
+  padding: 0 0.4rem 0 0.5rem;
+  border-bottom: 1px solid var(--aura-ink);
+  background: var(--aura-titlebar);
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.os-window__x {
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid currentColor;
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.os-window__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.6rem 0.7rem;
+}
+.os-window__corner {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 8px;
+  height: 8px;
+  background: repeating-linear-gradient(135deg, currentColor 0 1px, transparent 1px 3px);
+  opacity: 0.6;
+  pointer-events: none;
+}
+/* Dark translucent text panels for readability over video (digital mode). */
+.os-window--dark {
+  border-color: var(--aura-cyan);
+  background: rgba(16, 16, 16, 0.8);
+  color: var(--aura-cyan);
+  box-shadow:
+    inset 1px 1px 0 rgba(158, 231, 255, 0.35),
+    4px 4px 0 rgba(0, 0, 0, 0.5);
+}
+.os-window--dark .os-window__title {
+  border-bottom-color: var(--aura-cyan);
+  background: rgba(158, 231, 255, 0.14);
+  color: var(--aura-cyan);
+}
+/*
+ * Mirror mode: through a two-way mirror only bright pixels show and dim ones
+ * vanish. Black bodies, thicker cyan outlines, outline-style title bars (a
+ * solid cyan bar is a glare slab on the glass), no gray, no faded text.
+ */
+[data-mode="mirror"] .os-window {
+  border: 2px solid var(--aura-cyan);
+  background: var(--aura-black);
+  color: var(--aura-cyan);
+  box-shadow: none;
+}
+[data-mode="mirror"] .os-window__title {
+  border-bottom: 2px solid var(--aura-cyan);
+  background: var(--aura-black);
+  color: var(--aura-cyan);
+}
+[data-mode="mirror"] .opacity-60,
+[data-mode="mirror"] .opacity-70 {
+  opacity: 0.9;
+}
+[data-mode="mirror"] .os-window__body {
+  text-shadow: 0 0 6px color-mix(in srgb, var(--aura-cyan) 50%, transparent);
+}
+
+/* ---- terminal */
+.terminal {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.terminal__line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.terminal__cursor::after {
+  content: "\2588";
+  margin-left: 1px;
+  animation: blink 1s steps(1) infinite;
+}
+
+/* ---- boot */
+.boot-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 2rem;
+  background: var(--aura-bg);
+  color: var(--aura-cyan);
+}
+[data-mode="mirror"] .boot-screen {
+  background: var(--aura-black);
+}
+.boot-screen__box {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+.boot-screen__line {
+  white-space: pre-wrap;
+  min-height: 1.35em;
+}
+.boot-screen__status {
+  color: var(--aura-glow);
+  text-shadow: 0 0 6px var(--aura-cyan);
+  animation: status-stamp 160ms steps(2) both;
+}
+.boot-screen__status--warn {
+  opacity: 0.75;
+}
+@keyframes status-stamp {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- footer */
+.kiosk-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  height: 1.4rem;
+  padding: 0 0.75rem;
+  border-top: 1px solid var(--aura-cyan);
+  background: rgba(22, 22, 22, 0.85);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--aura-cyan);
+  opacity: 0.85;
+}
+[data-mode="mirror"] .kiosk-footer {
+  background: var(--aura-black);
+}
+.kiosk-footer__reboot {
+  font-family: var(--font-heading);
+  cursor: pointer;
+}
+.kiosk-footer__reboot:hover {
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+
+/* ---- gesture legend */
+.gesture-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.gesture-legend--empty {
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  opacity: 0.6;
+}
+.gesture-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(16, 16, 16, 0.8);
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+[data-mode="mirror"] .gesture-chip {
+  background: var(--aura-black);
+}
+.gesture-chip__emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+.privacy-line {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  text-align: center;
+}
+
+/* ---- mannequin */
+.mannequin-view {
+  position: absolute;
+  inset: 0;
+  transform-origin: top right;
+  transition: transform 750ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Idle: the guy waits small in the top right so the feed/reflection stays clear; a wave zooms him in. */
+.mannequin-view--corner {
+  transform: scale(0.45);
+}
+/*
+ * Mirror: the guy stays full size (never tucked into a corner) and stands on
+ * the left of the panel, away from the reflection on the right.
+ */
+.mannequin-view--mirror {
+  right: 0;
+}
+.mannequin-view__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mannequin-view__flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--aura-glow);
+  animation: aura-flash 320ms steps(4) both;
+}
+.stage-overlays {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 1rem;
+  pointer-events: none;
+}
+.stage-overlays > * {
+  pointer-events: auto;
+}
+
+/* ---- countdown */
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.countdown__digit {
+  font-size: clamp(8rem, 30vw, 22rem);
+  line-height: 0.8;
+  color: var(--aura-glow);
+  text-shadow: 0 0 24px var(--aura-cyan);
+  animation: count-pop 900ms ease-out both;
+}
+.countdown__label {
+  margin-top: 1rem;
+  font-size: 1rem;
+  letter-spacing: 0.3em;
+}
+
+/* ---- analyzing */
+.analyzing__dots::after {
+  content: "";
+  animation: dots 1.2s steps(4) infinite;
+}
+.progress-bar {
+  height: 8px;
+  border: 1px solid currentColor;
+  overflow: hidden;
+}
+.progress-bar__fill {
+  display: block;
+  height: 100%;
+  width: 30%;
+  background: currentColor;
+  animation: progress-slide 1.1s linear infinite;
+}
+
+/* ---- result (placeholder until Stage 2 reveal) */
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.result__aura {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid currentColor;
+  padding: 0.4rem;
+}
+.result__aura-value {
+  font-size: 4rem;
+  line-height: 0.9;
+}
+.result__nick {
+  font-size: 0.8rem;
+  text-align: center;
+}
+.result__items {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.result__bar {
+  display: grid;
+  grid-template-columns: 7rem 1fr 2.5rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+.result__bar-track {
+  height: 8px;
+  border: 1px solid currentColor;
+}
+.result__bar-fill {
+  display: block;
+  height: 100%;
+  background: currentColor;
+}
+.result__mods {
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.result__mod--penalty {
+  opacity: 0.7;
+}
+.result__verdict {
+  margin-top: 0.25rem;
+  font-size: 0.95rem;
+  text-align: center;
+}
+.mirror-aura {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.mirror-aura__value {
+  font-size: clamp(3rem, 12vw, 8rem);
+  line-height: 0.85;
+}
+
+/* ---- claim placeholder */
+.qr-placeholder {
+  width: 9rem;
+  height: 9rem;
+  border: 1px solid currentColor;
+  background:
+    repeating-linear-gradient(0deg, currentColor 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(90deg, currentColor 0 6px, transparent 6px 12px);
+  background-blend-mode: multiply;
+  opacity: 0.35;
+}
+
+/* ---- leaderboard name entry */
+.name-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.name-entry__input {
+  width: 100%;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  padding: 0.4rem 0.5rem;
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  text-transform: uppercase;
+  caret-color: currentColor;
+  outline: none;
+}
+.name-entry__input:focus {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.name-entry__input::placeholder {
+  color: currentColor;
+  opacity: 0.35;
+}
+.name-entry__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.name-entry__error::before {
+  content: "! ";
+}
+
+/* ---- tide chart */
+.tide-list li {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr auto;
+  gap: 0.5rem;
+  line-height: 1.6;
+}
+.tide-list__nick {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tide-list__king {
+  text-shadow: 0 0 8px var(--aura-cyan);
+}
+.tide-chart__flash {
+  animation: king-flash 1.2s steps(2) 3;
+}
+@keyframes king-flash {
+  50% {
+    background: color-mix(in srgb, var(--aura-cyan) 25%, transparent);
+  }
+}
+.claim-qr {
+  width: 11rem;
+  height: 11rem;
+  border: 1px solid var(--aura-ink);
+}
+
+/* ---- battle reveal */
+.battle-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.battle-reveal__title {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+.battle-reveal__sides {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 0.5rem;
+}
+.battle-reveal__vs {
+  align-self: center;
+  font-size: 2.4rem;
+}
+.battle-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border: 1px solid transparent;
+  transition: opacity 400ms;
+}
+.battle-side--winner {
+  border-color: var(--aura-glow);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--aura-cyan) 60%, transparent);
+  animation: fade-up 300ms ease-out both;
+}
+.battle-side--loser {
+  opacity: 0.55;
+}
+.battle-side__photo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: #000;
+  border: 1px solid currentColor;
+  overflow: hidden;
+}
+.battle-side__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.battle-side__badge {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--aura-glow);
+  color: var(--aura-ink);
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+}
+.battle-side__label {
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  opacity: 0.7;
+}
+.battle-side__nick {
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  text-align: center;
+}
+.battle-side__aura {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 0.9;
+}
+.battle-reveal__verdict {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  text-align: center;
+  animation: fade-up 300ms ease-out both;
+}
+.battle-reveal__roast {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-align: center;
+  animation: fade-up 300ms ease-out both;
+}
+
+/* ---- anger mark (wave meltdown) */
+.anger-symbol {
+  position: absolute;
+  left: 50%;
+  top: 6%;
+  width: 3.2rem;
+  height: 3.2rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: anger-pulse 700ms ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 6px var(--aura-cyan));
+}
+.anger-symbol__arc {
+  fill: none;
+  stroke: var(--aura-glow);
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+@keyframes anger-pulse {
+  from {
+    transform: translateX(-50%) scale(0.9) rotate(-6deg);
+  }
+  to {
+    transform: translateX(-50%) scale(1.1) rotate(6deg);
+  }
+}
+
+/* ---- attract */
+.attract-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 40%;
+  overflow: hidden;
+  border-top: 1px solid var(--aura-cyan);
+  border-bottom: 1px solid var(--aura-cyan);
+  background: rgba(16, 16, 16, 0.75);
+}
+[data-mode="mirror"] .attract-banner {
+  background: var(--aura-black);
+}
+.attract-banner__track {
+  display: flex;
+  gap: 4rem;
+  width: max-content;
+  padding: 0.5rem 0;
+  font-size: clamp(1.2rem, 4vw, 2.4rem);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  animation: marquee 14s linear infinite;
+}
+
+/* ---- settings + debug */
+.modal-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  align-items: center;
+  gap: 0.6rem 0.75rem;
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+}
+.settings-grid select,
+.settings-grid input[type="range"] {
+  width: 100%;
+  border: 1px solid currentColor;
+  background: transparent;
+  padding: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.debug-overlay {
+  position: absolute;
+  top: 2.25rem;
+  left: 0.75rem;
+  z-index: 25;
+  max-width: 28rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--aura-cyan);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+.debug-overlay__title {
+  font-family: var(--font-heading);
+  margin-bottom: 0.25rem;
+}
+.debug-overlay dl {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0 0.5rem;
+}
+.debug-overlay dt {
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+.debug-overlay dd {
+  word-break: break-word;
+}
+.debug-swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid #fff;
+  vertical-align: middle;
+}
+
+/* ---- keyframes */
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes os-open {
+  from {
+    transform: scale(0.6, 0.2);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1, 1);
+    opacity: 1;
+  }
+}
+@keyframes aura-flash {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes count-pop {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+}
+@keyframes dots {
+  to {
+    content: "...";
+  }
+}
+@keyframes progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-33.333%);
+  }
+}
+
+/* ---- mock analysis notice (no OPENAI_API_KEY) */
+.mock-notice {
+  margin-bottom: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--aura-cyan);
+  color: var(--aura-black);
+  font-family: var(--font-heading);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- boot curtain: the boot screen is cut across the middle and opens */
+.boot-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.boot-curtain__half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: var(--aura-bg);
+  animation-duration: 650ms;
+  animation-timing-function: cubic-bezier(0.7, 0, 0.3, 1);
+  animation-delay: 180ms;
+  animation-fill-mode: both;
+}
+.boot-curtain__half--top {
+  top: 0;
+  animation-name: curtain-top;
+}
+.boot-curtain__half--bottom {
+  bottom: 0;
+  animation-name: curtain-bottom;
+}
+.boot-curtain__seam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--aura-cyan);
+  box-shadow: 0 0 12px var(--aura-cyan), 0 0 32px var(--aura-cyan);
+  animation: curtain-seam 420ms steps(3) both;
+}
+@keyframes curtain-top {
+  to {
+    transform: translateY(-100%);
+  }
+}
+@keyframes curtain-bottom {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes curtain-seam {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  40% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+/* ---- sound locked: Chrome blocks audio until a click / key press */
+.sound-locked {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 40;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border: 2px solid var(--aura-cyan);
+  background: var(--aura-black);
+  color: var(--aura-cyan);
+  font-family: var(--font-heading);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  animation: sound-locked-pulse 1.4s steps(2, jump-none) infinite;
+}
+@keyframes sound-locked-pulse {
+  50% {
+    border-color: var(--aura-glow);
+    color: var(--aura-glow);
+  }
+}
