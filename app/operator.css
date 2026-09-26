@@ -293,3 +293,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+.op-open__main {
+  flex: 1;
+}

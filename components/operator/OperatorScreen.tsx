@@ -78,14 +78,51 @@ function Win({ title, children, className = "" }: { title: string; children: Rea
   );
 }
 
+/**
+ * Open the mirror: full screen on the portrait monitor (the kiosk laptop runs
+ * scripts/launch-kiosk.ps1), or as a window in this browser (one screen).
+ */
+function OpenMirror({ adminKey, live }: { adminKey: string; live: boolean }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const launch = async () => {
+    setBusy(true);
+    setMsg("OPENING THE MIRROR...");
+    try {
+      const res = await fetch("/api/operator/mirror", { method: "POST", headers: { "x-admin-key": adminKey } });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setMsg(res.ok ? "MIRROR OPENING ON THE PORTRAIT SCREEN (FIRST LOAD TAKES A FEW SECONDS)." : (body.error ?? `FAILED (${res.status}).`));
+    } catch {
+      setMsg("COULD NOT REACH THE SERVER.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const here = () => window.open("/kiosk?mode=mirror", "aura-mirror", "popup,width=720,height=1280");
+  return (
+    <div className="op-open">
+      <div className="op-add">
+        <button type="button" className="op-btn op-btn--go op-btn--big op-open__main" onClick={() => void launch()} disabled={busy || live}>
+          {live ? "MIRROR IS OPEN" : "🪞 OPEN MIRROR"}
+        </button>
+        <button type="button" className="op-btn op-btn--big" onClick={here} title="Open the kiosk as a window in this browser (single screen)">
+          OPEN IN THIS BROWSER
+        </button>
+      </div>
+      {msg && <div className="op-note">{msg}</div>}
+    </div>
+  );
+}
+
 /** What is on the mirror right now. */
-function MirrorNow({ status, now }: { status: KioskStatus | null; now: number }) {
+function MirrorNow({ status, now, adminKey }: { status: KioskStatus | null; now: number; adminKey: string }) {
   const live = status !== null && now - status.at < KIOSK_STATUS_STALE_MS;
   if (!status || !live) {
     return (
       <div className="op-mirror">
         <div className="op-mirror__state op-mirror__state--off font-heading">MIRROR OFFLINE</div>
-        <p className="op-note">OPEN THE KIOSK (npm run kiosk:launch) · LAST SEEN {status ? `${ago(now - status.at)} AGO` : "NEVER"}</p>
+        <p className="op-note">LAST SEEN {status ? `${ago(now - status.at)} AGO` : "NEVER"}</p>
+        <OpenMirror adminKey={adminKey} live={false} />
       </div>
     );
   }
@@ -176,6 +213,7 @@ function MirrorNow({ status, now }: { status: KioskStatus | null; now: number })
           CARD SAVED · OPEN {status.card.pageUrl.replace(/^https?:\/\//, "")}
         </a>
       )}
+      <OpenMirror adminKey={adminKey} live />
     </div>
   );
 }
@@ -289,7 +327,7 @@ export function OperatorScreen() {
       <div className="op__grid">
         <div className="op__col">
           <Win title="MIRROR_NOW.EXE">
-            <MirrorNow status={status.data?.status ?? null} now={now} />
+            <MirrorNow status={status.data?.status ?? null} now={now} adminKey={key} />
           </Win>
           <Win title="CONTROLS.EXE">
             <div className="op-controls">

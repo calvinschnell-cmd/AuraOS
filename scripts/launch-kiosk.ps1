@@ -17,7 +17,9 @@ param(
   # 1-based index into the display list printed below; 0 = pick the portrait monitor automatically.
   [int]$MirrorDisplay = 0,
   # Reopen only the mirror (the operator dashboard is already open).
-  [switch]$MirrorOnly
+  [switch]$MirrorOnly,
+  # Print what would open, start nothing (debugging the dashboard button).
+  [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,7 +61,7 @@ Write-Host ("  mirror  -> {0}x{1} at {2},{3}" -f $m.Width, $m.Height, $m.X, $m.Y
 
 $mirrorProfile = Join-Path $env:LOCALAPPDATA "AuraOS\chrome-mirror"
 New-Item -ItemType Directory -Force -Path $mirrorProfile | Out-Null
-Start-Process -FilePath $chrome -ArgumentList @(
+$mirrorArgs = @(
   "--user-data-dir=`"$mirrorProfile`"",
   "--no-first-run",
   "--no-default-browser-check",
@@ -70,6 +72,8 @@ Start-Process -FilePath $chrome -ArgumentList @(
   "--kiosk",
   "$Base/kiosk?mode=mirror"
 )
+if ($DryRun) { Write-Host "  DRY RUN: $chrome $($mirrorArgs -join " ")"; exit 0 }
+Start-Process -FilePath $chrome -ArgumentList $mirrorArgs
 
 if (-not $MirrorOnly) {
   Start-Sleep -Milliseconds 800
