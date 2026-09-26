@@ -3,14 +3,18 @@
 # (re)start it. Run from the repo on the kiosk laptop:
 #   bash scripts/server/deploy.sh
 # The server gets the laptop's .env.local with PUBLIC_BASE_URL set to the
-# domain (card QR codes open there). Caddy serves HTTPS for the domain, www
-# (redirected) and the sslip.io fallback name. First-time box setup:
+# public host (card QR codes open there). Caddy serves HTTPS for the domain,
+# www and the sslip.io fallback name, all with the same app. First-time box
+# setup:
 #   ssh root@HOST 'bash -s' < scripts/server/setup.sh
 set -euo pipefail
 
 HOST=${AURA_HOST:-root@155.138.165.43}
 KEY=${AURA_KEY:-$HOME/.ssh/aura_vultr}
 DOMAIN=${AURA_DOMAIN:-aurafulos.tech}
+# The name links use: www, whose certificate was issued first (the bare domain was
+# stuck behind Let's Encrypt's cached "no record" answer). Both names serve the app.
+PUBLIC_HOST=${AURA_PUBLIC_HOST:-www.$DOMAIN}
 IP=${HOST#*@}
 FALLBACK="${IP//./-}.sslip.io"
 
@@ -21,12 +25,12 @@ echo "==> shipping $(git rev-parse --short HEAD) to $HOST"
 git archive --format=tar HEAD | remote 'rm -rf /opt/aura/next && mkdir -p /opt/aura/next && tar -x -C /opt/aura/next'
 scp -q -i "$KEY" -o BatchMode=yes .env.local "$HOST:/opt/aura/next/.env.local"
 
-remote "DOMAIN='$DOMAIN' FALLBACK='$FALLBACK' bash -s" <<'REMOTE'
+remote "DOMAIN='$DOMAIN' PUBLIC_HOST='$PUBLIC_HOST' FALLBACK='$FALLBACK' bash -s" <<'REMOTE'
 set -euo pipefail
 cd /opt/aura/next
 # Server-side env: public links on the domain; no GPU segmenter, no printer here.
 sed -i -E '/^(PUBLIC_BASE_URL|ML_SERVICE_URL|PRINTING_ENABLED)=/d' .env.local
-printf 'PUBLIC_BASE_URL=https://%s\nML_SERVICE_URL=\nPRINTING_ENABLED=false\n' "$DOMAIN" >> .env.local
+printf 'PUBLIC_BASE_URL=https://%s\nML_SERVICE_URL=\nPRINTING_ENABLED=false\n' "$PUBLIC_HOST" >> .env.local
 chmod 600 .env.local
 chown -R aura:aura /opt/aura/next
 
@@ -60,13 +64,9 @@ WantedBy=multi-user.target
 UNIT
 
 cat > /etc/caddy/Caddyfile <<CADDY
-$DOMAIN, $FALLBACK {
+$DOMAIN, www.$DOMAIN, $FALLBACK {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:3000
-}
-
-www.$DOMAIN {
-	redir https://$DOMAIN{uri} permanent
 }
 CADDY
 
@@ -77,4 +77,4 @@ for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3000/feed && br
 systemctl --no-pager --lines=0 status aura | head -3
 curl -s -o /dev/null -w "local /feed -> %{http_code}\n" http://127.0.0.1:3000/feed
 REMOTE
-echo "==> live: https://$DOMAIN  (fallback https://$FALLBACK)"
+echo "==> live: https://$PUBLIC_HOST  (also https://$DOMAIN, https://$FALLBACK)"

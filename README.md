@@ -293,7 +293,7 @@ page links the badge on Solana Explorer.
 
 ## Deploying (at the event)
 
-Live at **https://aurafulos.tech** (Vultr `vhp-2c-4gb`, Atlanta, Ubuntu 24.04; the fallback name
+Live at **https://www.aurafulos.tech** (and https://aurafulos.tech) (Vultr `vhp-2c-4gb`, Atlanta, Ubuntu 24.04; the fallback name
 `https://155-138-165-43.sslip.io` works without DNS). The server only serves the phone side
 (`/r/[id]`, `/feed`, `/leaderboard`, `/u/[handle]`) and the APIs behind it; the kiosk laptop runs its
 own server and GPU segmenter. Both share Tiger Data, so a card saved at the mirror is on the site at
