@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { FeedScreen } from "@/components/companion/FeedScreen";
+import { feedSince } from "@/lib/feed/types";
 import { getScanStore } from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ const PAGE = 20;
 export default async function FeedPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab } = await searchParams;
   const entries = await getScanStore()
-    .feed(PAGE)
+    .feed(PAGE, null, feedSince())
     .catch(() => []);
   return <FeedScreen initial={entries} initialNext={entries.length === PAGE ? entries[entries.length - 1].createdAt : null} initialTab={tab === "standings" ? "standings" : "feed"} />;
 }

@@ -352,10 +352,21 @@ export class TigerStore implements ScanStore {
     const counts = await this.reactionCounts(rows.map((r) => r.id));
     return rows.map((r) => feedEntryOf(toCard(r), counts.get(r.id) ?? emptyReactions()));
   }
-  async feed(limit: number, before?: string | null) {
+  async feed(limit: number, before?: string | null, since?: string | null) {
     const { rows } = await (await this.db()).query<CardRow>(
-      `SELECT ${CARD_COLS} FROM cards WHERE parent_id IS NULL AND ($2::timestamptz IS NULL OR created_at < $2) ORDER BY created_at DESC LIMIT $1`,
-      [limit, before ?? null],
+      `SELECT ${CARD_COLS} FROM cards WHERE parent_id IS NULL AND ($2::timestamptz IS NULL OR created_at < $2) AND ($3::timestamptz IS NULL OR created_at > $3) ORDER BY created_at DESC LIMIT $1`,
+      [limit, before ?? null, since ?? null],
+    );
+    return this.toFeed(rows);
+  }
+  async cardsForHandle(handle: string, limit: number) {
+    const { rows } = await (await this.db()).query<CardRow>(
+      `SELECT ${CARD_COLS} FROM cards
+        WHERE (parent_id IS NULL AND battle_id IS NULL AND scan_id IN (SELECT scan_id FROM leaderboard_entries WHERE handle = $1))
+           OR (parent_id IS NULL AND battle_id IN (SELECT battle_id FROM battle_players WHERE handle = $1))
+           OR (parent_id IS NOT NULL AND scan_id IN (SELECT scan_id FROM battle_players WHERE handle = $1))
+        ORDER BY created_at DESC LIMIT $2`,
+      [handle.toUpperCase(), limit],
     );
     return this.toFeed(rows);
   }

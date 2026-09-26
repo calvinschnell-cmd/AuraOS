@@ -45,3 +45,14 @@ export interface FeedDetail {
   /** Squad: each member's own card ("from Squad Battle"). */
   children: FeedEntry[];
 }
+
+/**
+ * The public feed only shows the last half hour of the mirror. Nothing is
+ * deleted: card links and QR codes keep working, and cards claimed with an
+ * AURA ID stay on that player's profile (/u/[handle]).
+ */
+export const FEED_WINDOW_MS = 30 * 60 * 1000;
+
+export function feedSince(now = Date.now()): string {
+  return new Date(now - FEED_WINDOW_MS).toISOString();
+}

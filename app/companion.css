@@ -459,3 +459,61 @@ a.standings__row:active {
   font-size: 0.8rem;
   opacity: 0.6;
 }
+
+/* profile (/u/[handle]) */
+.profile__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+.profile__stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.45rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(16, 16, 16, 0.88);
+}
+.profile__stats dt {
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+}
+.profile__stats dd {
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--aura-glow);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile__cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+.profile__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(16, 16, 16, 0.88);
+}
+.profile__card img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 1px solid var(--aura-cyan);
+}
+.profile__card-meta {
+  font-size: 0.5rem;
+}
+.profile__card-score {
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--aura-glow);
+}
+.profile__card-react {
+  min-height: 1em;
+  font-size: 0.7rem;
+}

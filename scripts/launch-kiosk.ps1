@@ -7,6 +7,7 @@
 #
 #   npm run kiosk:launch                 # defaults
 #   npm run kiosk:launch -- -Base http://localhost:3000 -MirrorDisplay 2
+#   npm run kiosk:launch -- -MirrorOnly   # reopen just the mirror
 #
 # The mirror uses its own Chrome profile (so kiosk mode never takes over your
 # normal browser). First launch only: click Allow on the camera prompt; set the
@@ -14,7 +15,9 @@
 param(
   [string]$Base = "http://localhost:3000",
   # 1-based index into the display list printed below; 0 = pick the portrait monitor automatically.
-  [int]$MirrorDisplay = 0
+  [int]$MirrorDisplay = 0,
+  # Reopen only the mirror (the operator dashboard is already open).
+  [switch]$MirrorOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,9 +71,11 @@ Start-Process -FilePath $chrome -ArgumentList @(
   "$Base/kiosk?mode=mirror"
 )
 
-Start-Sleep -Milliseconds 800
-Write-Host "  operator -> main display ($Base/operator)"
-Start-Process -FilePath $chrome -ArgumentList @("--new-window", "$Base/operator")
+if (-not $MirrorOnly) {
+  Start-Sleep -Milliseconds 800
+  Write-Host "  operator -> main display ($Base/operator)"
+  Start-Process -FilePath $chrome -ArgumentList @("--new-window", "$Base/operator")
+}
 
 Write-Host ""
 Write-Host "Mirror: Alt+F4 closes it (it is a separate Chrome profile). Operator: unlock once with ADMIN_KEY from .env.local."

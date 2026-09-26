@@ -129,7 +129,14 @@ export interface ScanStore {
   recentBattles(limit: number): Promise<StoredBattle[]>;
 
   /** Public feed: top-level cards, newest first, with reaction counts. */
-  feed(limit: number, before?: string | null): Promise<FeedEntry[]>;
+  /** Saved cards, newest first: older than `before` (paging), newer than `since` (the live window). */
+  feed(limit: number, before?: string | null, since?: string | null): Promise<FeedEntry[]>;
+  /**
+   * Every card on a player's profile: solo cards whose entry carries their
+   * AURA ID, battle and squad cards where they claimed a slot, and their own
+   * card from a squad. Newest first.
+   */
+  cardsForHandle(handle: string, limit: number): Promise<FeedEntry[]>;
   feedEntry(cardId: string): Promise<FeedEntry | null>;
   /** Squad member cards of a squad card. */
   childCards(parentId: string): Promise<FeedEntry[]>;
@@ -320,9 +327,25 @@ export class MemoryStore implements ScanStore {
     for (const [emoji, clients] of this.s.reactions.get(cardId) ?? []) out[emoji] = clients.size;
     return out;
   }
-  async feed(limit: number, before?: string | null) {
+  async feed(limit: number, before?: string | null, since?: string | null) {
     return this.s.cards
-      .filter((c) => c.parentId === null && (!before || c.createdAt < before))
+      .filter((c) => c.parentId === null && (!before || c.createdAt < before) && (!since || c.createdAt > since))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit)
+      .map((c) => feedEntryOf(c, this.counts(c.id)));
+  }
+  async cardsForHandle(handle: string, limit: number) {
+    const h = handle.toUpperCase();
+    const soloScans = new Set(this.s.entries.filter((e) => e.handle === h).map((e) => e.scanId));
+    const claimed = this.s.battles.flatMap((b) => b.players.filter((p) => p.handle === h).map((p) => ({ battleId: b.id, scanId: p.scanId })));
+    const battleIds = new Set(claimed.map((c) => c.battleId));
+    const memberScans = new Set(claimed.map((c) => c.scanId));
+    return this.s.cards
+      .filter((c) =>
+        c.parentId === null
+          ? (c.battleId === null && c.scanId !== null && soloScans.has(c.scanId)) || (c.battleId !== null && battleIds.has(c.battleId))
+          : c.scanId !== null && memberScans.has(c.scanId),
+      )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit)
       .map((c) => feedEntryOf(c, this.counts(c.id)));

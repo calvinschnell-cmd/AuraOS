@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FeedEntry } from "@/lib/feed/types";
+import { FEED_WINDOW_MS, type FeedEntry } from "@/lib/feed/types";
 import type { LeaderboardSnapshot } from "@/lib/kiosk/types";
 import { handleName, rivalryLine } from "@/lib/leaderboard/narrative";
 import { formatAura } from "@/lib/scoring";
@@ -103,7 +103,7 @@ function Standings({ snapshot, squadCardId }: { snapshot: LeaderboardSnapshot | 
         </div>
       )}
       <ol className="standings__list">
-        {top.slice(0, 30).map((e, i) => {
+        {top.slice(0, 10).map((e, i) => {
           const streak = e.handle ? narrative?.streaks[e.handle] : undefined;
           const up = e.handle ? narrative?.improved[e.handle] : undefined;
           const href = e.cardId ? `/r/${e.cardId}` : e.handle ? `/u/${encodeURIComponent(e.handle)}` : null;
@@ -203,9 +203,16 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
     }
   }, [next]);
 
-  const [hero, ...rest] = entries;
+  // The feed is the last half hour: cards age out on an open page too.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setClock(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const live = entries.filter((e) => clock - Date.parse(e.createdAt) < FEED_WINDOW_MS);
+  const [hero, ...rest] = live;
   const champ = standings?.narrative?.squadChampion ?? null;
-  const squadCardId = champ ? (entries.find((e) => e.battleId === champ.battleId && e.kind === "squad")?.id ?? null) : null;
+  const squadCardId = champ ? (live.find((e) => e.battleId === champ.battleId && e.kind === "squad")?.id ?? null) : null;
 
   return (
     <main className="companion aura-grid-bg">
@@ -221,7 +228,7 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
           <p className="wordmark__sub font-mono uppercase">LIVE FROM THE MIRROR · HACKGT 13</p>
         </div>
         <IdentityBar />
-        {hero ? <JustScanned key={hero.id} entry={hero} fresh={hero.id === freshId} /> : <p className="companion__note">NO CARDS YET. SCAN AT THE MIRROR AND GIVE IT A THUMBS UP.</p>}
+        {hero ? <JustScanned key={hero.id} entry={hero} fresh={hero.id === freshId} /> : <p className="companion__note">NOTHING IN THE LAST 30 MINUTES. SCAN AT THE MIRROR AND GIVE IT A THUMBS UP.</p>}
         <div className="feed-tabs" role="tablist">
           {(["feed", "standings"] as const).map((t) => (
             <button key={t} type="button" role="tab" aria-selected={tab === t} className={`feed-tabs__tab font-heading ${tab === t ? "feed-tabs__tab--on" : ""}`} onClick={() => chooseTab(t)}>
@@ -231,6 +238,7 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
         </div>
         {tab === "feed" ? (
           <>
+            <p className="companion__note">THE LAST 30 MINUTES AT THE MIRROR. TAP A CARD AND HIT “THIS WAS ME” TO KEEP IT ON YOUR PROFILE.</p>
             <FeedList entries={rest} />
             {next && (
               <button type="button" className="card-page__button" onClick={more} disabled={loading}>
