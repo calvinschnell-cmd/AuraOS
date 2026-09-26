@@ -293,7 +293,21 @@ page links the badge on Solana Explorer.
 
 ## Deploying (at the event)
 
-Hosting (Vultr) and the domain are set up live at the event. The app is ready for it: all config
+Live at **https://aurafulos.tech** (Vultr `vhp-2c-4gb`, Atlanta, Ubuntu 24.04; the fallback name
+`https://155-138-165-43.sslip.io` works without DNS). The server only serves the phone side
+(`/r/[id]`, `/feed`, `/leaderboard`, `/u/[handle]`) and the APIs behind it; the kiosk laptop runs its
+own server and GPU segmenter. Both share Tiger Data, so a card saved at the mirror is on the site at
+once, and the kiosk's `PUBLIC_BASE_URL` (the domain) is what its QR codes open.
+
+- One-time box setup (Node 22 checksum-verified, Caddy for HTTPS, an `aura` user, ufw 80/443):
+  `ssh -i ~/.ssh/aura_vultr root@155.138.165.43 'bash -s' < scripts/server/setup.sh`
+- Every deploy ships the committed `HEAD` plus the laptop's `.env.local` (with `PUBLIC_BASE_URL`
+  forced to the domain), builds on the box, swaps and restarts the `aura` systemd service:
+  `bash scripts/server/deploy.sh` (`AURA_DOMAIN`, `AURA_HOST`, `AURA_KEY` override the defaults).
+- Logs: `ssh -i ~/.ssh/aura_vultr root@155.138.165.43 journalctl -u aura -f`.
+- DNS: A records for `@` and `www` to `155.138.165.43`; Caddy fetches the certificates itself.
+
+The app needs nothing host-specific: all config
 is env vars (copy `.env.example`), public links use `PUBLIC_BASE_URL` (else the request's own
 origin), QR codes use the page origin, the only localhost default is the GPU sidecar
 (`ML_SERVICE_URL`), and all state lives in Tiger Data. For badges on a host, pass the wallet and
