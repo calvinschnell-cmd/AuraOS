@@ -26,8 +26,28 @@ type WasmFileset = Awaited<ReturnType<Vision["FilesetResolver"]["forVisionTasks"
 
 let visionPromise: Promise<{ vision: Vision; fileset: WasmFileset } | null> | null = null;
 
+/**
+ * MediaPipe's WASM prints routine startup chatter ("INFO: Created TensorFlow
+ * Lite XNNPACK delegate", glog "W0000/I0000" lines, OpenGL notes) through
+ * console.error, which the Next.js dev overlay counts as an app error. Route
+ * exactly those lines to console.debug; everything else is untouched.
+ */
+const MEDIAPIPE_CHATTER = /^(INFO: |WARNING: Logging before InitGoogle|[IW]\d{4} |.*gl_context\.cc|.*OpenGL error checking)/;
+let chatterQuieted = false;
+
+function quietMediapipeChatter(): void {
+  if (chatterQuieted || typeof console === "undefined") return;
+  chatterQuieted = true;
+  const error = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === "string" && MEDIAPIPE_CHATTER.test(args[0])) return console.debug("[mediapipe]", ...args);
+    error(...args);
+  };
+}
+
 export function loadVision(): Promise<{ vision: Vision; fileset: WasmFileset } | null> {
   if (!visionPromise) {
+    quietMediapipeChatter();
     visionPromise = (async () => {
       try {
         const vision = await import("@mediapipe/tasks-vision");
