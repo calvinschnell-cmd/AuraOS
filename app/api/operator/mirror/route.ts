@@ -1,37 +1,32 @@
-import { spawn } from "node:child_process";
-import { existsSync, openSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { NextResponse } from "next/server";
-import { KIOSK_STATUS_STALE_MS } from "@/lib/kiosk/status";
 import { adminKeyFrom, isAdmin } from "@/lib/server/admin";
-import { getKioskStatus } from "@/lib/server/store";
+import { launchMirror, mirrorIsLive } from "@/lib/server/mirrorLaunch";
+import { getRelay } from "@/lib/server/relay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * POST (operator, ADMIN_KEY): open the mirror on the kiosk laptop, i.e. run
- * scripts/launch-kiosk.ps1 -MirrorOnly (full screen on the portrait monitor).
- * Fixed command, no user input. Only on the Windows kiosk laptop; the public
- * server answers 400. Refuses while a mirror is already reporting in.
+ * POST (admin, ADMIN_KEY): open the mirror. On the Windows kiosk laptop it runs
+ * scripts/launch-kiosk.ps1 -MirrorOnly right here; anywhere else (the public
+ * server) it leaves a launch request in Tiger Data that the laptop's server
+ * picks up within a few seconds (mirrorLaunch.ts). Refuses while a mirror is
+ * already reporting in.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   if (!isAdmin(adminKeyFrom(request))) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  if (process.platform !== "win32") return NextResponse.json({ error: "ONLY ON THE KIOSK LAPTOP." }, { status: 400 });
-  const status = getKioskStatus();
-  if (status && Date.now() - status.at < KIOSK_STATUS_STALE_MS) return NextResponse.json({ error: "THE MIRROR IS ALREADY OPEN." }, { status: 409 });
-  const script = path.join(process.cwd(), "scripts", "launch-kiosk.ps1");
-  if (!existsSync(script)) return NextResponse.json({ error: "LAUNCHER NOT FOUND." }, { status: 500 });
-  const port = new URL(request.url).port || "3000";
-  // Not detached: PowerShell without a console exits without running anything. The launcher
-  // lives for a second; Chrome (started by it) is independent. Output goes to a log for debugging.
-  const log = openSync(path.join(tmpdir(), "aura-mirror-launch.log"), "a");
-  const child = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `& "${script}" -MirrorOnly -Base http://localhost:${port} *>&1`],
-    { stdio: ["ignore", log, log], windowsHide: true },
-  );
-  child.on("error", (err) => console.error("[aura] mirror launch failed", err));
-  return NextResponse.json({ ok: true });
+  if (await mirrorIsLive().catch(() => false)) return NextResponse.json({ error: "THE MIRROR IS ALREADY OPEN." }, { status: 409 });
+  if (process.platform === "win32") {
+    const result = launchMirror(new URL(request.url).port || "3000");
+    return result.ok ? NextResponse.json({ ok: true, relayed: false }) : NextResponse.json({ error: result.error }, { status: 500 });
+  }
+  const relay = getRelay();
+  if (relay.kind !== "tiger") return NextResponse.json({ error: "ONLY ON THE KIOSK LAPTOP." }, { status: 400 });
+  try {
+    await relay.requestMirrorLaunch();
+  } catch (err) {
+    console.error("[aura] mirror launch request failed", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "COULD NOT REACH THE DATABASE." }, { status: 503 });
+  }
+  return NextResponse.json({ ok: true, relayed: true });
 }

@@ -595,7 +595,7 @@ export function getKioskStatus(): KioskStatus | null {
 
 /** A challenge stays in the queue this long (then they probably wandered off). */
 export const CHALLENGE_TTL_MS = 20 * 60 * 1000;
-const MAX_CHALLENGES = 12;
+export const MAX_CHALLENGES = 12;
 let challengeSeq = 0;
 
 export function liveChallenges(now = Date.now()): Challenge[] {

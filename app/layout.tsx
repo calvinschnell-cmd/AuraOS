@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { IBM_Plex_Mono, Silkscreen, VT323 } from "next/font/google";
+import { HomeLink } from "@/components/HomeLink";
 import "./globals.css";
 
 const silkscreen = Silkscreen({
@@ -41,7 +42,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`${silkscreen.variable} ${vt323.variable} ${plexMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <HomeLink />
+      </body>
     </html>
   );
 }

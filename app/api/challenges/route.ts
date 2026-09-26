@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { checkPlayerName } from "@/lib/profanity";
 import { adminKeyFrom, isAdmin } from "@/lib/server/admin";
-import { getScanStore, lastCalled, liveChallenges, pushChallenge } from "@/lib/server/store";
+import { getRelay } from "@/lib/server/relay";
+import { getScanStore } from "@/lib/server/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,10 +13,13 @@ export const dynamic = "force-dynamic";
  * up (the mirror announces them once).
  */
 export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({
-    challenges: liveChallenges().map(({ id, name, target, cardId, at }) => ({ id, name, target, cardId, at })),
-    called: lastCalled(),
-  });
+  const relay = getRelay();
+  try {
+    const [challenges, called] = await Promise.all([relay.challenges(), relay.lastCalled()]);
+    return NextResponse.json({ challenges: challenges.map(({ id, name, target, cardId, at }) => ({ id, name, target, cardId, at })), called });
+  } catch {
+    return NextResponse.json({ error: "UNAVAILABLE" }, { status: 503 });
+  }
 }
 
 /**
@@ -32,11 +36,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   const cardId = typeof body?.cardId === "string" ? body.cardId : "";
   if (!cardId) {
     if (!isAdmin(adminKeyFrom(request))) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    const { position } = pushChallenge({ name: check.name, target: 0, cardId: "" });
+    const { position } = await getRelay().pushChallenge({ name: check.name, target: 0, cardId: "" });
     return NextResponse.json({ position });
   }
   const entry = await getScanStore().feedEntry(cardId).catch(() => null);
   if (!entry) return NextResponse.json({ error: "UNKNOWN CARD." }, { status: 404 });
-  const { position } = pushChallenge({ name: check.name, target: entry.target, cardId });
+  const { position } = await getRelay().pushChallenge({ name: check.name, target: entry.target, cardId });
   return NextResponse.json({ position });
 }

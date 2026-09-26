@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminKeyFrom, isAdmin } from "@/lib/server/admin";
-import { callChallenge, removeChallenge } from "@/lib/server/store";
+import { getRelay } from "@/lib/server/relay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ function idOf(raw: string): number | null {
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   if (!isAdmin(adminKeyFrom(request))) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const id = idOf((await params).id);
-  const called = id === null ? null : callChallenge(id);
+  const called = id === null ? null : await getRelay().callChallenge(id);
   return called ? NextResponse.json({ called }) : NextResponse.json({ error: "NOT IN QUEUE" }, { status: 404 });
 }
 
@@ -22,5 +22,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   if (!isAdmin(adminKeyFrom(request))) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const id = idOf((await params).id);
-  return id !== null && removeChallenge(id) ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "NOT IN QUEUE" }, { status: 404 });
+  return id !== null && (await getRelay().removeChallenge(id)) ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "NOT IN QUEUE" }, { status: 404 });
 }

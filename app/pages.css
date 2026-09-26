@@ -1,3 +1,27 @@
+/* ================================================================ HOME link (every page but the launcher) */
+
+.home-link {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 45; /* over the kiosk overlays, under the full-screen admin QR */
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(10, 10, 10, 0.85);
+  color: var(--aura-cyan);
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  transition: opacity 200ms ease;
+}
+.home-link:hover {
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+.home-link--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ================================================================ share card (1080x1350, rendered offscreen) */
 
 .card-offscreen {

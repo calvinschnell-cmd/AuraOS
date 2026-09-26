@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isKioskStatus } from "@/lib/kiosk/status";
-import { getKioskStatus, setKioskStatus } from "@/lib/server/store";
+import { getRelay } from "@/lib/server/relay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,10 +22,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "BAD STATUS" }, { status: 400 });
   }
   if (!isKioskStatus(body)) return NextResponse.json({ error: "BAD STATUS" }, { status: 400 });
-  setKioskStatus({ ...body, at: Date.now() });
+  try {
+    await getRelay().setKioskStatus(body);
+  } catch (err) {
+    console.error("[aura] kiosk status write failed", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "STATUS NOT SAVED" }, { status: 503 });
+  }
   return NextResponse.json({ ok: true });
 }
 
 export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ status: getKioskStatus(), now: Date.now() });
+  const relay = getRelay();
+  const status = await relay.kioskStatus().catch(() => null);
+  return NextResponse.json({ status, now: Date.now(), relay: relay.kind });
 }

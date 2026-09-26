@@ -102,8 +102,14 @@ function OpenMirror({ adminKey, live }: { adminKey: string; live: boolean }) {
     setMsg("OPENING THE MIRROR...");
     try {
       const res = await fetch("/api/operator/mirror", { method: "POST", headers: { "x-admin-key": adminKey } });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setMsg(res.ok ? "MIRROR OPENING ON THE PORTRAIT SCREEN (FIRST LOAD TAKES A FEW SECONDS)." : (body.error ?? `FAILED (${res.status}).`));
+      const body = (await res.json().catch(() => ({}))) as { error?: string; relayed?: boolean };
+      setMsg(
+        !res.ok
+          ? (body.error ?? `FAILED (${res.status}).`)
+          : body.relayed
+            ? "SENT TO THE KIOSK LAPTOP: THE MIRROR OPENS IN A FEW SECONDS (ITS SERVER MUST BE RUNNING)."
+            : "MIRROR OPENING ON THE PORTRAIT SCREEN (FIRST LOAD TAKES A FEW SECONDS).",
+      );
     } catch {
       setMsg("COULD NOT REACH THE SERVER.");
     } finally {
@@ -384,7 +390,7 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
   const [now, setNow] = useState(() => Date.now());
   const [sent, setSent] = useState<string | null>(null);
   const [editBoard, setEditBoard] = useState(false);
-  const status = usePoll<{ status: KioskStatus | null }>("/api/kiosk/status", POLL.status);
+  const status = usePoll<{ status: KioskStatus | null; relay?: "tiger" | "memory" }>("/api/kiosk/status", POLL.status);
   const queue = usePoll<{ challenges: QueuedChallenger[]; called: CalledChallenger | null }>("/api/challenges", POLL.queue);
   const stats = usePoll<UsageStats>("/api/stats", POLL.stats);
   const feed = usePoll<{ entries: FeedEntry[] }>("/api/feed", POLL.feed);
@@ -436,10 +442,9 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
         </nav>
         <span className="op-note">{new Date(now).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
       </header>
-      {!isLocal && (
+      {!isLocal && status.data?.relay === "memory" && (
         <div className="op-banner font-mono">
-          PUBLIC SERVER: FEED, STANDINGS AND BOARD EDITS WORK HERE (SHARED DATABASE). THE MIRROR, ITS CONTROLS, SIGN-UPS AND OPEN MIRROR ONLY WORK ON THE
-          KIOSK LAPTOP. OPEN <b>LOCALHOST:3000/ADMIN</b> THERE.
+          NO SHARED DATABASE ON THIS SERVER: THE MIRROR, ITS CONTROLS AND SIGN-UPS ONLY SHOW UP ON THE KIOSK LAPTOP. OPEN <b>LOCALHOST:3000/ADMIN</b> THERE.
         </div>
       )}
       <div className="op__grid">

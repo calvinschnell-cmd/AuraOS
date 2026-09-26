@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { REMOTE_COMMANDS, type RemoteCommandName } from "@/lib/kiosk/types";
 import { adminKeyFrom, isAdmin } from "@/lib/server/admin";
-import { pushRemoteCommand, remoteCommandsSince } from "@/lib/server/store";
+import { getRelay } from "@/lib/server/relay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,11 +13,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!body.command || !REMOTE_COMMANDS.includes(body.command as RemoteCommandName)) {
     return NextResponse.json({ error: "UNKNOWN COMMAND" }, { status: 400 });
   }
-  return NextResponse.json(pushRemoteCommand(body.command as RemoteCommandName));
+  try {
+    return NextResponse.json(await getRelay().pushCommand(body.command as RemoteCommandName));
+  } catch (err) {
+    console.error("[aura] remote command failed", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "NOT SENT" }, { status: 503 });
+  }
 }
 
 /** GET ?since=cursor: commands queued after the cursor (kiosk polling fallback). */
 export async function GET(request: Request): Promise<NextResponse> {
   const since = Number.parseInt(new URL(request.url).searchParams.get("since") ?? "0", 10) || 0;
-  return NextResponse.json(remoteCommandsSince(since));
+  try {
+    return NextResponse.json(await getRelay().commandsSince(since));
+  } catch {
+    return NextResponse.json({ error: "UNAVAILABLE" }, { status: 503 });
+  }
 }

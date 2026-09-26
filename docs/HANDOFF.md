@@ -19,14 +19,28 @@ feed a phone companion site. Data lives in Tiger Data (TimescaleDB).
 | Screen | Where | What |
 | --- | --- | --- |
 | Mirror (user side) | kiosk laptop, portrait monitor, `http://localhost:3000/kiosk?mode=mirror` | The kiosk. Full screen in its own Chrome profile (`%LOCALAPPDATA%\AuraOS\chrome-mirror`). |
-| Admin (laptop) | `http://localhost:3000/admin` | The one admin page (`/operator` and `/remote` redirect here): mirror status (what's on screen, camera, people in frame), OPEN MIRROR, controls, sign-ups (walk-ins, CALL UP, remove), live feed, standings with EDIT / DELETE, today's stats, phone QR (tap → full screen for judges). Unlock with `ADMIN_KEY` (remembered in localStorage). On the public server only the feed, standings, board edits and QR work (mirror state, controls and sign-ups are per server); a banner says so. |
+| Admin | `http://localhost:3000/admin` on the laptop, or https://www.aurafulos.tech/admin from anywhere | The one admin page (`/operator` and `/remote` redirect here): mirror status (what's on screen, camera, people in frame), OPEN MIRROR, controls, sign-ups (walk-ins, CALL UP, remove), live feed, standings with EDIT / DELETE, today's stats, phone QR (tap → full screen for judges). Unlock with `ADMIN_KEY` (remembered in localStorage). Works the same from the public server: see "Kiosk relay" below. |
 | Phones | https://www.aurafulos.tech (also https://aurafulos.tech, https://155-138-165-43.sslip.io) | `/feed`: card just scanned (react live) + FEED (last 30 min) and STANDINGS (top 10, tap → card) tabs. `/r/[id]`: a card (react, BEAT THIS SCORE → queue, THIS WAS ME → claim). `/u/[handle]`: shareable profile (every card tied to the AURA ID). `/leaderboard`: big-screen Tide Chart (its QR opens `/feed?tab=standings`). |
 
 Launch both screens: `npm run kiosk:launch` (mirror on the portrait display,
 admin on the main one). `npm run kiosk:launch -- -MirrorOnly` reopens only
 the mirror; `-DryRun` prints the plan. The dashboard's OPEN MIRROR button runs
-the same launcher (`/api/operator/mirror`, Windows laptop only; refused while a
-mirror is reporting).
+the same launcher (`/api/operator/mirror`; refused while a mirror is reporting).
+Every page but the launcher has a HOME link bottom-left (on `/kiosk` and
+`/leaderboard` it only shows while the mouse moves).
+
+### Kiosk relay
+
+The mirror talks to the laptop's server; phones and judges use the public one.
+With Tiger Data configured, both share the relay tables (`lib/server/relay.ts`,
+tables `kiosk_status`, `remote_commands`, `challengers`, `mirror_launches`), so
+`/admin` on either server sees the mirror, sends controls, and manages the same
+line (BEAT THIS SCORE taps on phones reach the mirror). OPEN MIRROR on the
+public server leaves a launch request; the laptop's server polls for it every
+3 s (`instrumentation.ts` → `lib/server/mirrorLaunch.ts`, Windows + Tiger only)
+and runs the launcher, so the laptop server must be running. Without Tiger
+(MOCK MODE) all of this stays in one server's memory, and the public `/admin`
+shows a banner saying to use the laptop.
 
 The kiosk laptop runs the full app locally (`npm run dev`, or `npm run build` +
 `npm run start`, plus `npm run ml` for the CUDA garment segmenter on :8001).

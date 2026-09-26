@@ -124,6 +124,35 @@ export const TIGER_SCHEMA: readonly string[] = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
 
+  // Kiosk relay (lib/server/relay.ts): the mirror's status, remote commands, the
+  // challenger line and mirror launch requests, shared by the kiosk laptop and the
+  // public server so /admin works from either.
+  `CREATE TABLE IF NOT EXISTS kiosk_status (
+    id smallint PRIMARY KEY,
+    status jsonb NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS remote_commands (
+    id bigserial PRIMARY KEY,
+    command text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS challengers (
+    id bigserial PRIMARY KEY,
+    name text NOT NULL,
+    target double precision NOT NULL DEFAULT 0,
+    card_id text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    called_at timestamptz,
+    removed boolean NOT NULL DEFAULT false
+  )`,
+  `CREATE INDEX IF NOT EXISTS challengers_called_idx ON challengers (called_at DESC) WHERE called_at IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS mirror_launches (
+    id bigserial PRIMARY KEY,
+    requested_at timestamptz NOT NULL DEFAULT now(),
+    taken_at timestamptz
+  )`,
+
   `CREATE MATERIALIZED VIEW IF NOT EXISTS aura_15m
     WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
     SELECT

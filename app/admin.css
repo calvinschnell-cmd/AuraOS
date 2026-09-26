@@ -5,6 +5,7 @@
 
 .op {
   min-height: 100vh;
+  padding-bottom: 3rem; /* room for the HOME link */
   color: var(--aura-cyan);
   display: flex;
   flex-direction: column;

@@ -141,6 +141,11 @@ export class TigerStore implements ScanStore {
   constructor(private readonly pool: Pool) {}
 
   /** Schema on first use; retried on the next call if it failed. */
+  /** The pool, schema applied (the kiosk relay shares it). */
+  connection(): Promise<Pool> {
+    return this.db();
+  }
+
   private async db(): Promise<Pool> {
     this.ready ??= ensureTigerSchema(this.pool).catch((err) => {
       this.ready = null;
