@@ -1,5 +1,5 @@
 import { predictArchetype, type PoseModel } from "./classifier";
-import { dynamismSignals, type DynamismSignals } from "./features";
+import { dynamismSignals, powerPose, type DynamismSignals } from "./features";
 import type { PoseSnapshot } from "./landmarks";
 
 /**
@@ -61,6 +61,9 @@ function isArchetype(id: string): id is ArchetypeId {
   return id in ARCHETYPES;
 }
 
+/** powerPose strength that counts as the superhero stance. */
+export const POWER_POSE_MIN = 0.5;
+
 export function scorePose(model: PoseModel, snapshot: PoseSnapshot | null, source: "live" | "mock" = "live"): PoseResult {
   if (!snapshot) {
     return { score: NO_POSE_SCORE, archetype: "unknown", label: "POSE NOT DETECTED", match: 0, signals: null, standout: null, source: "none" };
@@ -73,16 +76,20 @@ export function scorePose(model: PoseModel, snapshot: PoseSnapshot | null, sourc
   // standing photo" counts too; a confident named archetype is a small bonus.
   const named = prediction.archetype !== STIFF_ARCHETYPE ? prediction.confidence : 0;
   const raw = 0.12 + 0.5 * d + 0.3 * (1 - stiff) + 0.12 * named;
-  const score = Math.round(Math.max(0, Math.min(1, raw)) * 100);
   const loudest = (Object.keys(signals) as (keyof DynamismSignals)[]).sort((a, b) => signals[b] - signals[a])[0];
-  const archetype = isArchetype(prediction.archetype) ? prediction.archetype : "unknown";
+  const predicted = isArchetype(prediction.archetype) ? prediction.archetype : "unknown";
+  // Fists on hips, elbows out: a hero stance even though nothing moves (see powerPose).
+  const power = powerPose(snapshot);
+  const isPower = power >= POWER_POSE_MIN;
+  const archetype = isPower ? "hero" : predicted;
+  const score = Math.round(Math.max(0, Math.min(1, isPower ? Math.max(raw, 0.6 + 0.2 * power) : raw)) * 100);
   return {
     score,
     archetype,
     label: archetype === "unknown" ? prediction.archetype.toUpperCase() : ARCHETYPES[archetype].label,
-    match: Math.round(prediction.confidence * 100),
+    match: isPower ? Math.max(Math.round(power * 100), predicted === "hero" ? Math.round(prediction.confidence * 100) : 0) : Math.round(prediction.confidence * 100),
     signals,
-    standout: signals[loudest] >= 0.35 ? SIGNAL_LABELS[loudest] : null,
+    standout: isPower ? "SUPERHERO POWER POSE" : signals[loudest] >= 0.35 ? SIGNAL_LABELS[loudest] : null,
     source,
   };
 }

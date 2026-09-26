@@ -192,3 +192,32 @@ export function dynamismSignals(s: PoseSnapshot): DynamismSignals {
     kneeBend: unit((175 - Math.min(kneeL, kneeR)) / 70),
   };
 }
+
+/**
+ * The superhero "power pose" (Superman: fists on hips, elbows flared) as a
+ * 0-1 strength. It is still and symmetric, so the dynamism signals score it
+ * like standing around, and the weakly labeled hero photos blur it with plain
+ * standing; this detects it straight from the geometry instead. Both sides
+ * have to do it: one hand on a hip is just a hand on a hip.
+ */
+export function powerPose(s: PoseSnapshot): number {
+  const n = poseGeometry(s).norm; // hip-centered, y down, torso lengths (shoulders at y ~ -1)
+  const side = (shoulder: number, elbow: number, wrist: number, hip: number) => {
+    const w = n[wrist];
+    const e = n[elbow];
+    const sameSide = Math.sign(w.x) === Math.sign(n[hip].x) || Math.abs(w.x) < 0.05;
+    // Fist at the waist: between the hip joint and 3/4 of the way up to the shoulders...
+    const waistY = unit(1 - Math.max(0, w.y - 0.15, -0.75 - w.y) / 0.2);
+    // ...at the side of the body: from just inside the hip to a little past the shoulder.
+    const x = Math.abs(w.x);
+    const waistX = sameSide ? unit(1 - Math.max(0, Math.abs(n[hip].x) - 0.1 - x, x - (Math.abs(n[shoulder].x) + 0.3)) / 0.15) : 0;
+    // Elbow flared wider than the shoulder, above the hand.
+    const flare = unit((Math.abs(e.x) - Math.abs(n[shoulder].x) - 0.02) / 0.14);
+    const handBelowElbow = w.y > e.y ? 1 : 0;
+    // Arm bent at the elbow (a straight arm hanging down is not akimbo).
+    const angle = (jointAngle(n[shoulder], e, w) * 180) / Math.PI;
+    const bent = angle >= 40 && angle <= 145 ? 1 : 0;
+    return waistY * waistX * flare * handBelowElbow * bent;
+  };
+  return Math.min(side(LM.shoulderL, LM.elbowL, LM.wristL, LM.hipL), side(LM.shoulderR, LM.elbowR, LM.wristR, LM.hipR));
+}

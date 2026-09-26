@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { predictArchetype, predictFeatures, softmax, type PoseModel } from "@/lib/pose/classifier";
-import { FEATURE_NAMES, dynamismSignals, jointAngle, poseFeatures } from "@/lib/pose/features";
+import { FEATURE_NAMES, dynamismSignals, jointAngle, poseFeatures, powerPose } from "@/lib/pose/features";
 import { LANDMARK_COUNT, compactSnapshot, isPoseSnapshot, mirrorSnapshot, snapshotFromMediapipe, type PoseSnapshot } from "@/lib/pose/landmarks";
 import { POSE_MODEL, modelMatchesFeatures } from "@/lib/pose/model";
 import { NO_POSE_SCORE, POSE_AURA_PER_POINT, POSE_NEUTRAL, describePose, dynamism, poseAura, scorePose } from "@/lib/pose/score";
@@ -143,5 +143,24 @@ describe("pose trainer", () => {
       [0, 2],
     ]);
     expect(m.macroF1).toBeCloseTo((2 / 3 + 0.8) / 2, 5);
+  });
+});
+
+describe("superhero power pose", () => {
+  it("recognizes fists on hips with elbows out as a hero stance, even though nothing moves", () => {
+    const hero = skeletonSnapshot(MOCK_POSES.hero);
+    expect(powerPose(hero)).toBeGreaterThan(0.9);
+    expect(powerPose(mirrorSnapshot(hero))).toBeGreaterThan(0.9);
+    const r = scorePose(POSE_MODEL, hero);
+    expect(r.archetype).toBe("hero");
+    expect(r.standout).toBe("SUPERHERO POWER POSE");
+    expect(r.score).toBeGreaterThanOrEqual(75);
+  });
+
+  it("ignores arms hanging down, raised arms and one hand on a hip", () => {
+    expect(powerPose(skeletonSnapshot(MOCK_POSES.standing))).toBe(0);
+    expect(powerPose(skeletonSnapshot(MOCK_POSES.dance))).toBe(0);
+    const oneHand = { ...MOCK_POSES.hero, right: MOCK_POSES.standing.right };
+    expect(powerPose(skeletonSnapshot(oneHand))).toBe(0);
   });
 });
