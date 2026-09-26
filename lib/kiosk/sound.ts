@@ -24,6 +24,12 @@ export class SoundEngine {
     return this.ensure();
   }
 
+  /** The effects master (mute + volume applied): other effect sources (crowd reactions) connect here. */
+  output(): GainNode | null {
+    this.ensure();
+    return this.master;
+  }
+
   private ensure(): AudioContext | null {
     if (typeof window === "undefined" || !("AudioContext" in window)) return null;
     if (!this.ctx) {

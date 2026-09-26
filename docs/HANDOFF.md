@@ -62,9 +62,28 @@ tabs stay in sync.
   also unmutes. Saved in the kiosk settings (`volume`, `musicMuted`,
   `voiceMuted` in `KioskSettings`); remote commands `music` / `voice` toggle the
   last two.
-- `/music-lab`: developer page with the real engine: play, jump 5 s before the
-  loop point to hear the wrap, the jingle, and a full result (jingle → voice →
-  loop returns). Only has sound where the files exist (the laptop).
+- Loop points are editable: `/music-lab` has LOOP START / LOOP END (slider,
+  seconds, ±0.1 s, SET = PLAYHEAD, click the bar to seek), HEAR THE SEAM,
+  PAUSE / RESUME, and SAVE (ADMIN_KEY) / REVERT / DEFAULT. Saved to
+  `public/audio/loop.json` on the laptop (gitignored) via `/api/music-loop`;
+  the mirror re-reads it every 30 s (`MusicEngine.refreshLoop`), no reload. A
+  start after 0:00 = the intro plays once, then [start, end) repeats. Validation
+  in `lib/kiosk/musicLoop.ts` (start < end, ≥ 1 s apart).
+- Crowd reactions after a solo aura (`lib/kiosk/reactionTiers.ts`,
+  `lib/kiosk/reactions.ts`), same bands as the voice callouts: ≥ 500k WOOOOO,
+  ≥ 150k little cheer, −150k..150k crickets, −500k..−150k awwww, ≤ −500k a
+  cartoon fart. Queued with `Announcer.sound()` right after the aura callout
+  (jingle → "Your aura is…" → reaction → verdict), so nothing overlaps; the loop
+  stays ducked through it. Clips come from `/api/sfx/[name]`: generated once
+  with the ElevenLabs sound-effects API and saved to
+  `public/audio/reactions/*.mp3` (gitignored; all five were generated on the
+  laptop on 2026-09-26). Without a key or clips (MOCK MODE) each reaction is
+  synthesized in Web Audio. They play through the effects master: MUTE ALL and
+  volume apply, MUTE MUSIC / MUTE VOICE don't. Solo scans only (not battles).
+- `/music-lab`: developer page with the real engine: the loop editor above, the
+  jingle, each crowd reaction (labelled CLIP or SYNTH), and a full result
+  (jingle → voice → reaction → loop returns). Only has music where the files
+  exist (the laptop).
 
 ### Kiosk relay
 
@@ -166,7 +185,7 @@ server.
 5. Gemini judge availability (503 / timeouts from Google at last check).
 6. **Kiosk audio not yet heard on the real mirror.** The loop point was checked
    in `/music-lab` (1:17 → 1:22 → wraps to 0:00), but the jingle → voice order
-   and the ducking have only been reasoned about and checked in the lab, not
+   and the ducking (and now the crowd reactions) have only been checked in the lab, not
    heard end to end with the ElevenLabs voice. Levels (`BG_LEVEL` 0.12,
    `JINGLE_LEVEL` 0.5) may need tuning in the room. Open question for the user:
    jingle on battle results too, or solo scans only (currently both).
@@ -197,5 +216,5 @@ server.
   tools, or write the snippet to a file and append it.
 - `next dev` adds each dist dir it sees (`.next-mock`, `.next-demo`) to
   `tsconfig.json` includes; eslint ignores them in `eslint.config.mjs`.
-- Verify with `npm run lint`, `npm run typecheck`, `npm test` (203 tests), and
+- Verify with `npm run lint`, `npm run typecheck`, `npm test` (208 tests), and
   `npm run build` (don't build into `.next` while `next dev` is running).

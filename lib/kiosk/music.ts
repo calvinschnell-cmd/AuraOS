@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import type { Announcer } from "./announcer";
+import { DEFAULT_LOOP, parseLoop, type MusicLoop } from "./musicLoop";
 import type { SoundEngine } from "./sound";
 import type { KioskState } from "./types";
 
@@ -20,8 +21,8 @@ import type { KioskState } from "./types";
 
 const BG_URL = "/audio/kiosk-bg.flac";
 const JINGLE_URL = "/audio/result-jingle.flac";
-/** The loop is the first 1:22 of the track (the rest is its ending). */
-const BG_LOOP_END_S = 82;
+/** How often the mirror re-reads the saved loop points (set in /music-lab). */
+const LOOP_REFRESH_MS = 30_000;
 /** Quiet: under the room, never over the voice. */
 const BG_LEVEL = 0.12;
 const JINGLE_LEVEL = 0.5;
@@ -32,6 +33,19 @@ const RETURN_AFTER_VOICE_MS = 1_500;
 
 /** States with their own sound (the charge hum, the countdown, judging): no music under them. */
 const QUIET_STATES: ReadonlySet<KioskState> = new Set(["CHARGING", "COUNTDOWN", "ANALYZING", "LOBBY_COUNTDOWN", "BATTLE_INTRO"]);
+
+/** The saved loop points (the default when none were saved or the server is unreachable). */
+export async function fetchLoop(): Promise<{ loop: MusicLoop; saved: boolean }> {
+  try {
+    const res = await fetch("/api/music-loop", { cache: "no-store" });
+    const body = (await res.json()) as { loop?: unknown; saved?: boolean };
+    const loop = parseLoop(body.loop);
+    if (loop) return { loop, saved: Boolean(body.saved) };
+  } catch {
+    // offline: default
+  }
+  return { loop: DEFAULT_LOOP, saved: false };
+}
 
 async function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer | null> {
   try {
@@ -76,7 +90,9 @@ export class MusicEngine {
       this.bgGain.gain.value = 0;
       this.bgGain.connect(this.out);
       this.buffers ??= Promise.all([loadBuffer(ctx, BG_URL), loadBuffer(ctx, JINGLE_URL)]);
-      [this.bg, this.jingle] = await this.buffers;
+      const [[bg, jingle], saved] = await Promise.all([this.buffers, fetchLoop()]);
+      [this.bg, this.jingle] = [bg, jingle];
+      this.loopPoints = saved.loop;
       if (gen === this.generation) this.startLoop();
     })();
     return this.loading;
@@ -114,40 +130,68 @@ export class MusicEngine {
     this.bgGain.gain.setTargetAtTime(down ? 0 : BG_LEVEL, now, down ? DUCK_TC_S : RETURN_TC_S);
   }
 
-  /** Where the loop was started: context time, and the track position it started from. */
-  private loopStartedAt = { ctxTime: 0, offset: 0 };
+  /** Where the track loops ([start, end), seconds); the saved one replaces the default on load. */
+  private loopPoints: MusicLoop = DEFAULT_LOOP;
+  /** Anchor for position(): a context time and the track position playing at that time. */
+  private anchor = { ctxTime: 0, offset: 0 };
 
   private startLoop(offset = 0): void {
     if (!this.ctx || !this.bg || !this.bgGain || this.bgSource) return;
     const source = this.ctx.createBufferSource();
     source.buffer = this.bg;
     source.loop = true;
-    source.loopStart = 0;
-    source.loopEnd = this.loopEnd;
+    source.loopStart = this.loop.start;
+    source.loopEnd = this.loop.end;
     source.connect(this.bgGain);
     source.start(0, offset);
     this.bgSource = source;
-    this.loopStartedAt = { ctxTime: this.ctx.currentTime, offset };
+    this.anchor = { ctxTime: this.ctx.currentTime, offset };
     this.applyBgLevel();
   }
 
-  get loopEnd(): number {
-    return Math.min(BG_LOOP_END_S, this.bg?.duration ?? BG_LOOP_END_S);
+  /** The loop in effect, clamped to the track once it is loaded. */
+  get loop(): MusicLoop {
+    const length = this.bg?.duration;
+    if (!length) return this.loopPoints;
+    const end = Math.min(this.loopPoints.end, length);
+    return { start: Math.min(this.loopPoints.start, Math.max(0, end - 1)), end };
   }
 
   get trackLength(): number | null {
     return this.bg?.duration ?? null;
   }
 
-  /** Current position in the track (seconds, wraps at the loop point); null before it plays. */
-  position(): number | null {
-    if (!this.ctx || !this.bgSource) return null;
-    const t = this.loopStartedAt.offset + (this.ctx.currentTime - this.loopStartedAt.ctxTime);
-    return t < this.loopEnd ? t : t % this.loopEnd;
+  /** Change the loop points, live: the playing source picks them up without a restart. */
+  setLoop(loop: MusicLoop): void {
+    const pos = this.position();
+    this.loopPoints = loop;
+    const { start, end } = this.loop;
+    if (this.bgSource && this.ctx) {
+      this.bgSource.loopStart = start;
+      this.bgSource.loopEnd = end;
+      // Past the new end, the source wraps to the new start right away.
+      if (pos !== null) this.anchor = { ctxTime: this.ctx.currentTime, offset: pos < end ? pos : start };
+    }
   }
 
-  /** Restart the loop from a track position (the music lab uses it to hear the seam). */
-  seek(seconds: number): void {
+  /** Re-read the saved loop (the mirror calls this every LOOP_REFRESH_MS). */
+  async refreshLoop(): Promise<void> {
+    const { loop } = await fetchLoop();
+    const { start, end } = this.loopPoints;
+    if (loop.start !== start || loop.end !== end) this.setLoop(loop);
+  }
+
+  /** Track position the loop was paused at (null: not paused). */
+  private pausedAt: number | null = null;
+
+  get paused(): boolean {
+    return this.pausedAt !== null;
+  }
+
+  /** Stop the loop where it is (resume() continues from there). */
+  pause(): void {
+    const at = this.position();
+    if (at === null || this.pausedAt !== null) return;
     try {
       this.bgSource?.stop();
     } catch {
@@ -155,7 +199,36 @@ export class MusicEngine {
     }
     this.bgSource?.disconnect();
     this.bgSource = null;
-    this.startLoop(Math.max(0, Math.min(seconds, this.loopEnd - 0.05)));
+    this.pausedAt = at;
+  }
+
+  resume(): void {
+    if (this.pausedAt === null) return;
+    const at = this.pausedAt;
+    this.pausedAt = null;
+    this.startLoop(at);
+  }
+
+  /** Current position in the track (seconds, following the loop); null before it plays. */
+  position(): number | null {
+    if (this.pausedAt !== null) return this.pausedAt;
+    if (!this.ctx || !this.bgSource) return null;
+    const { start, end } = this.loop;
+    const t = this.anchor.offset + (this.ctx.currentTime - this.anchor.ctxTime);
+    return t < end ? t : start + ((t - end) % (end - start));
+  }
+
+  /** Restart the loop from a track position (the music lab uses it to hear the seam). */
+  seek(seconds: number): void {
+    this.pausedAt = null;
+    try {
+      this.bgSource?.stop();
+    } catch {
+      // not started
+    }
+    this.bgSource?.disconnect();
+    this.bgSource = null;
+    this.startLoop(Math.max(0, Math.min(seconds, this.loop.end - 0.05)));
   }
 
   /** Play the result jingle now; returns its length in ms (null: no jingle file). */
@@ -189,6 +262,7 @@ export class MusicEngine {
     this.out = null;
     this.bgGain = null;
     this.loading = null;
+    this.pausedAt = null;
   }
 }
 
@@ -208,6 +282,12 @@ export function useKioskMusic({ sound, announcer, state, muted, volume }: { soun
   useEffect(() => music.setMuted(muted), [music, muted]);
   useEffect(() => music.setVolume(volume), [music, volume]);
   useEffect(() => music.duck("scan", QUIET_STATES.has(state)), [music, state]);
+
+  // A loop saved in /music-lab reaches the mirror without a reload.
+  useEffect(() => {
+    const id = window.setInterval(() => void music.refreshLoop(), LOOP_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [music]);
 
   const returnTimer = useRef(0);
   useEffect(() => {

@@ -55,6 +55,8 @@ interface QueueItem extends Cue {
   /** Premium (ElevenLabs) line: fetched a couple of items ahead, not all at once. */
   premium: boolean;
   clip?: Promise<Blob | null>;
+  /** A sound effect instead of a line (crowd reaction): plays, and the queue waits its length (ms). */
+  run?: () => number | null;
 }
 
 /** Roughly how long a line takes to say (for silent cues). */
@@ -114,6 +116,16 @@ export class Announcer {
     if (clean.length === 0 && !hooked) return;
     this.queue.push({ lines: clean, gapMs, premium: true, ...cue });
     this.prefetch();
+    if (!this.speaking) void this.drain();
+  }
+
+  /**
+   * Queue a sound effect in line with the voice (the crowd reacting right
+   * after the aura is said): it plays when its turn comes and the next line
+   * waits until it is over. Plays even with the voice muted (it is not a line).
+   */
+  sound(run: () => number | null, pauseMs = 0): void {
+    this.queue.push({ lines: [], gapMs: 0, premium: false, run, pauseMs });
     if (!this.speaking) void this.drain();
   }
 
@@ -195,6 +207,11 @@ export class Announcer {
 
   /** One queue item: its hooks around the clip, the browser voice, or (muted / voiceless) an estimated silence. */
   private async speak(item: QueueItem): Promise<void> {
+    if (item.run) {
+      const ms = item.run();
+      if (ms) await sleep(ms);
+      return;
+    }
     const hooked = Boolean(item.onStart || item.onEnd);
     const silent = async () => {
       item.onStart?.();

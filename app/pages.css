@@ -653,3 +653,68 @@
   align-items: center;
   gap: 0.75rem;
 }
+.music-lab__window {
+  width: min(100% - 2rem, 44rem);
+}
+.music-lab__track {
+  cursor: pointer;
+  height: 22px;
+}
+.music-lab__region {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 6px);
+  opacity: 0.35;
+}
+.music-lab__point {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border: 1px dashed currentColor;
+}
+.music-lab__point-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.music-lab__point-label {
+  min-width: 6.5rem;
+  font-family: var(--font-heading);
+}
+.music-lab__point-time {
+  min-width: 4.5rem;
+  font-size: 1.4rem;
+}
+.music-lab__seconds {
+  width: 6.5rem;
+}
+.music-lab__range {
+  width: 100%;
+}
+.music-lab__warn {
+  color: #8b1e2d;
+}
+.music-lab__save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid currentColor;
+}
+.music-lab__save-btn:not(:disabled) {
+  background: var(--aura-ink);
+  color: var(--aura-window);
+}
+.tool-page__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.music-lab__reactions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}

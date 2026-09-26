@@ -14,6 +14,8 @@ import { isIdleState } from "@/lib/kiosk/machine";
 import type { PoseSnapshot } from "@/lib/pose/landmarks";
 import { MeltdownTracker } from "@/lib/kiosk/meltdown";
 import { useKioskMusic } from "@/lib/kiosk/music";
+import { reactionFor } from "@/lib/kiosk/reactionTiers";
+import { useReactions } from "@/lib/kiosk/reactions";
 import { useAudioAllowed, useSoundEngine } from "@/lib/kiosk/sound";
 import { CAMERA_ROTATIONS, type KioskEvent, type KioskMode, type RemoteCommandName, type ScreenSide, type UsageStats } from "@/lib/kiosk/types";
 import type { ModeChoice } from "./props";
@@ -182,6 +184,8 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
   const sound = useSoundEngine(settings.muted);
   const audioAllowed = useAudioAllowed(sound);
   // Quiet background loop + result jingle; never under a voice line (lib/kiosk/music.ts).
+  // The crowd reacts to a solo aura (cheer, WOOOOO, crickets, awww, fail), right after the number is said.
+  const reactions = useReactions(sound);
   const music = useKioskMusic({ sound, announcer, state, muted: settings.muted || settings.musicMuted, volume: settings.volume });
   useEffect(() => {
     announcer.setVolume(settings.volume);
@@ -222,13 +226,15 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
       auraSpoken.current = id;
       resultSting(session.scan.aura < 0);
       announcer.say(auraCallout(session.scan.aura), 450);
+      const reaction = reactionFor(session.scan.aura);
+      announcer.sound(() => reactions.play(reaction), 200);
     }
     if (reveal.state.verdict && verdictSpoken.current !== id) {
       verdictSpoken.current = id;
       announcer.sayPremium(judgesAnnouncement(session.scan.breakdown, session.scan.analysis.verdict));
       announcer.sayPremium([pickPrompt("resultActions")]);
     }
-  }, [reveal, session.scan, announcer, resultSting, pickPrompt]);
+  }, [reveal, session.scan, announcer, resultSting, reactions, pickPrompt]);
 
   useEffect(() => {
     if (session.roast) announcer.sayPremium([session.roast]);
