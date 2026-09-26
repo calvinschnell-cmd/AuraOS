@@ -317,7 +317,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
     setNextWaveSide((s) => (s === "left" ? "right" : "left"));
   }, [sendWithMeltdown, nextWaveSide]);
 
-  // ---- operator remote (/remote)
+  // ---- operator remote (/admin controls)
   const onRemote = useCallback(
     (command: RemoteCommandName) => {
       switch (command) {

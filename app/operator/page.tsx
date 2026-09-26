@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
-import { OperatorScreen } from "@/components/operator/OperatorScreen";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "AURA OS // OPERATOR" };
-
-/** The operator's laptop screen while the mirror shows /kiosk (ADMIN_KEY to unlock). */
+/** Old name for the admin dashboard. */
 export default function OperatorPage() {
-  return <OperatorScreen />;
+  redirect("/admin");
 }

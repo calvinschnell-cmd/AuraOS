@@ -7,8 +7,7 @@ const ROUTES: { href: string; label: string; note: string }[] = [
   { href: "/kiosk?mode=mirror", label: "KIOSK (MIRROR)", note: "two-way mirror, pure black" },
   { href: "/feed", label: "FEED", note: "companion app: every card, reactions" },
   { href: "/leaderboard", label: "LEADERBOARD", note: "tide chart, rivalries, squad champion" },
-  { href: "/remote", label: "REMOTE", note: "operator control, ADMIN_KEY" },
-  { href: "/admin", label: "ADMIN", note: "delete entries, ADMIN_KEY" },
+  { href: "/admin", label: "ADMIN", note: "mirror, controls, feed, board edits, ADMIN_KEY" },
 ];
 
 export default function Home() {

@@ -1,4 +1,4 @@
-/* ================================================================ operator dashboard (/operator)
+/* ================================================================ admin dashboard (/admin)
  * The laptop screen next to the mirror: same OS windows, cyan on the grid
  * desktop, three columns that fit a landscape laptop without scrolling.
  */
@@ -288,9 +288,89 @@
   white-space: nowrap;
 }
 
+/* the feed: every card from the last 30 minutes, scrolls inside its window */
+.op-cards--feed {
+  max-height: 26rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+/* header links, public-server banner */
+.op__links {
+  display: flex;
+  gap: 1rem;
+}
+.op__links a:hover {
+  color: var(--aura-glow);
+  text-shadow: 0 0 6px var(--aura-glow);
+}
+.op-banner {
+  margin: 0.9rem 0.9rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--aura-cyan);
+  background: rgba(10, 10, 10, 0.9);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+/* standings: TOP 12 / EDIT tabs; edit rows get a delete button */
+.op-tabs {
+  display: flex;
+  gap: 0.4rem;
+}
+.op-board__row--edit {
+  grid-template-columns: 1.8rem 1fr auto auto;
+}
+
+/* phone QR (tap for full screen to show judges) */
+.op-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: zoom-in;
+}
+.op-qr img {
+  width: min(100%, 13rem);
+  image-rendering: pixelated;
+}
+.op-qr__label {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+}
+.op-qr-full {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  background: var(--aura-black);
+  color: var(--aura-cyan);
+  cursor: zoom-out;
+}
+.op-qr-full img {
+  width: min(80vw, 70vh);
+  image-rendering: pixelated;
+}
+.op-qr-full__title {
+  font-size: clamp(1rem, 3vw, 2rem);
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 10px var(--aura-glow);
+}
+.op-qr-full__url {
+  font-size: clamp(0.8rem, 2vw, 1.3rem);
+  letter-spacing: 0.15em;
+}
+
 @media (max-width: 1100px) {
   .op__grid {
     grid-template-columns: 1fr;
+  }
+  .op__links {
+    display: none;
   }
 }
 

@@ -37,8 +37,7 @@
   gap: 0.75rem;
 }
 .card-page__button,
-.tool-page__button,
-.remote__button {
+.tool-page__button {
   padding: 0.5rem 0.9rem;
   border: 1px solid currentColor;
   font-family: var(--font-heading);
@@ -215,47 +214,6 @@
   background: transparent;
   font-family: var(--font-mono);
 }
-.tool-page__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin: 0.75rem 0;
-  max-height: 60vh;
-  overflow: auto;
-}
-.tool-page__list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.3rem 0;
-  border-bottom: 1px dashed currentColor;
-}
-.tool-page__button--danger:hover {
-  background: #8b1e2d;
-  color: #fff;
-}
-.remote__grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-}
-.remote__button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 1.4rem 0.5rem;
-  font-size: 0.75rem;
-}
-.remote__button:active {
-  background: var(--aura-ink);
-  color: var(--aura-window);
-}
-.remote__emoji {
-  font-size: 1.8rem;
-}
-
 /* ================================================================ /certificate/[id] (print) */
 
 .cert {

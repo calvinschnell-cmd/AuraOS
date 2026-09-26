@@ -46,7 +46,7 @@ Plex Mono, and no rounded corners.
 
 | Spec | Implementation |
 | --- | --- |
-| Same lobby, N slots (cap 5), START once 2+ | `newLobby("squad")` (capacity 5), `canStart`; START via 👍 / two fists / Enter / the button / `/remote`; a 75s idle squad starts on its own. |
+| Same lobby, N slots (cap 5), START once 2+ | `newLobby("squad")` (capacity 5), `canStart`; START via 👍 / two fists / Enter / the button / `/admin` controls; a 75s idle squad starts on its own. |
 | Parallel scoring, tiled mannequins | Same pipeline; `setCrew` lays out up to 5 figures with shadows and framing scaled to the line-up. |
 | Group Aura banner (synergy joke stat) | `squadSynergy` (cohesive but distinct top styles) and `squadScore` (average × 0.75-1.25). |
 | Group commentary: vibe archetype + one short line per player | `squadPrompt` (opener + "P1: ..." lines, < 15 words each), `parseSquadCommentary` puts each line under its mannequin. Rule-based vibe archetype (`squadVibe`) is the banner / card verdict. |

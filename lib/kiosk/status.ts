@@ -3,7 +3,7 @@ import type { KioskMode, KioskState, SessionState } from "./types";
 /**
  * What the mirror is doing right now, as the operator dashboard sees it. The
  * kiosk posts this to /api/kiosk/status whenever it changes (and as a
- * heartbeat); the laptop's /operator page polls it. Only what is already on
+ * heartbeat); the laptop's /admin page polls it. Only what is already on
  * the public mirror screen: no photos, no personal data.
  */
 export interface KioskStatus {

@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
 import { AdminKeyGate, useAdminKey } from "@/components/admin/AdminKeyGate";
-import { REMOTE_BUTTONS } from "@/components/remote/RemoteScreen";
 import type { FeedEntry } from "@/lib/feed/types";
+import { makeQrDataUrl } from "@/lib/kiosk/qr";
 import { KIOSK_STATUS_STALE_MS, type KioskStatus } from "@/lib/kiosk/status";
-import type { KioskState, RemoteCommandName, UsageStats } from "@/lib/kiosk/types";
+import type { KioskState, LeaderboardEntry, LeaderboardSnapshot, RemoteCommandName, UsageStats } from "@/lib/kiosk/types";
 import type { CalledChallenger, QueuedChallenger } from "@/lib/kiosk/useChallenges";
 import { useLeaderboard } from "@/lib/kiosk/useLeaderboard";
 import { handleName, rivalryLine } from "@/lib/leaderboard/narrative";
@@ -32,6 +32,18 @@ const STATE_LABEL: Record<KioskState, string> = {
   BATTLE_RESULT: "BATTLE RESULT ON SCREEN",
   SULKING: "SULKING (TOO MUCH WAVING)",
 };
+
+/** Remote buttons: queued on the server, the mirror polls them. */
+const REMOTE_BUTTONS: { command: RemoteCommandName; label: string; emoji: string }[] = [
+  { command: "battle", label: "AURA BATTLE", emoji: "⚔️" },
+  { command: "squad", label: "SQUAD", emoji: "👥" },
+  { command: "scan", label: "SCAN / CAPTURE", emoji: "✌️✌️" },
+  { command: "start", label: "START BATTLE", emoji: "▶" },
+  { command: "wave", label: "SIMULATE WAVE", emoji: "👋" },
+  { command: "reset", label: "RESET", emoji: "↺" },
+  { command: "mute", label: "MUTE", emoji: "🔇" },
+  { command: "mode", label: "MODE TOGGLE", emoji: "🪞" },
+];
 
 const POLL = { status: 1_000, queue: 3_000, stats: 10_000, feed: 8_000 };
 
@@ -275,15 +287,103 @@ function SignUps({ adminKey, queue, called, onChange, now }: { adminKey: string;
   );
 }
 
+/** Every entry on the board (top + recent), with delete. */
+function BoardEditor({ adminKey, snapshot }: { adminKey: string; snapshot: LeaderboardSnapshot | null }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  // Hidden right away; the next leaderboard poll (5 s) confirms it.
+  const [deleted, setDeleted] = useState<ReadonlySet<string>>(() => new Set());
+  const byId = new Map<string, LeaderboardEntry>();
+  for (const e of [...(snapshot?.top ?? []), ...(snapshot?.recent ?? [])]) byId.set(e.id, e);
+  const entries = [...byId.values()].filter((e) => !deleted.has(e.id)).sort((a, b) => b.aura - a.aura);
+
+  const remove = async (e: LeaderboardEntry) => {
+    if (!window.confirm(`Delete ${e.nickname} (${formatAura(e.aura)}) from the board?`)) return;
+    setMsg("DELETING...");
+    const res = await fetch(`/api/admin/entry/${e.id}`, { method: "DELETE", headers: { "x-admin-key": adminKey } });
+    setMsg(res.ok ? `${e.nickname.toUpperCase()} DELETED.` : `FAILED (${res.status}).`);
+    if (res.ok) setDeleted((d) => new Set(d).add(e.id));
+  };
+
+  return (
+    <>
+      <div className="op-note">{msg ?? `${entries.length} ENTRIES · ✕ REMOVES ONE FROM THE BOARD`}</div>
+      <ol className="op-board">
+        {entries.map((e, i) => (
+          <li key={e.id} className="op-board__row op-board__row--edit">
+            <span className="font-number op-board__rank">{i + 1}</span>
+            <span className="op-board__who">
+              {e.nickname}
+              <span className="op-dim"> · {new Date(e.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+            </span>
+            <span className="font-number op-glow">{formatAura(e.aura, true)}</span>
+            <button type="button" className="op-btn" onClick={() => void remove(e)} aria-label={`Delete ${e.nickname}`}>
+              ✕
+            </button>
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
+
+/** Scan-to-open QR for the phone site (show it to judges); tap it for full screen. */
+function PhoneQr({ url }: { url: string }) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [big, setBig] = useState(false);
+  useEffect(() => {
+    makeQrDataUrl(url, 720).then(setQr).catch(() => setQr(null));
+  }, [url]);
+  useEffect(() => {
+    if (!big) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setBig(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [big]);
+  const label = url.replace(/^https?:\/\//, "").toUpperCase();
+  if (!qr) return <div className="op-note">MAKING QR...</div>;
+  return (
+    <>
+      <button type="button" className="op-qr" onClick={() => setBig(true)} title="Show full screen">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={qr} alt={`QR code for ${url}`} />
+        <span className="op-qr__label font-heading">{label}</span>
+      </button>
+      <div className="op-note">SCAN FOR THE LIVE FEED + STANDINGS · TAP FOR FULL SCREEN</div>
+      {big && (
+        <button type="button" className="op-qr-full" onClick={() => setBig(false)} aria-label="Close full-screen QR">
+          <span className="op-qr-full__title font-heading">SCAN ME · AURA BATTLES</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qr} alt={`QR code for ${url}`} />
+          <span className="op-qr-full__url font-heading">{label}</span>
+          <span className="op-note">TAP OR ESC TO CLOSE</span>
+        </button>
+      )}
+    </>
+  );
+}
+
+const noSubscribe = () => () => {};
+
+/** The mirror reports to (and takes commands from) the server on its own laptop. */
+function useIsLocalHost(): boolean {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname),
+    () => true,
+  );
+}
+
 /**
- * The operator's laptop screen (the mirror shows /kiosk): what the mirror is
- * doing, who is signed up next, the live standings, today's numbers and the
- * newest cards, plus the remote controls. Everything updates on its own.
+ * The one admin page (ADMIN_KEY): what the mirror is doing, OPEN MIRROR, the
+ * remote controls, who is signed up next, the live feed, the standings (with
+ * board edits), today's numbers and a phone QR for the site. Updates on its own.
  */
-export function OperatorScreen() {
+export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: string | null }) {
   const { key, verified, setKey, verify, error } = useAdminKey();
+  const isLocal = useIsLocalHost();
   const [now, setNow] = useState(() => Date.now());
   const [sent, setSent] = useState<string | null>(null);
+  const [editBoard, setEditBoard] = useState(false);
   const status = usePoll<{ status: KioskStatus | null }>("/api/kiosk/status", POLL.status);
   const queue = usePoll<{ challenges: QueuedChallenger[]; called: CalledChallenger | null }>("/api/challenges", POLL.queue);
   const stats = usePoll<UsageStats>("/api/stats", POLL.stats);
@@ -305,7 +405,7 @@ export function OperatorScreen() {
       <main className="tool-page aura-grid-bg">
         <div className="os-window os-window--light tool-page__window">
           <header className="os-window__title">
-            <span>OPERATOR.EXE · UNLOCK</span>
+            <span>ADMIN.EXE · UNLOCK</span>
             <span>x</span>
           </header>
           <div className="os-window__body">
@@ -318,12 +418,30 @@ export function OperatorScreen() {
 
   const narrative = snapshot?.narrative ?? null;
   const u = stats.data;
+  const phoneUrl = `${publicBaseUrl ?? window.location.origin}/feed`;
   return (
     <main className="op aura-grid-bg">
       <header className="op__bar font-heading">
-        <span>AURA OS · OPERATOR</span>
+        <span>AURA OS · ADMIN</span>
+        <nav className="op__links">
+          <a href="/feed" target="_blank" rel="noreferrer">
+            PHONE FEED ↗
+          </a>
+          <a href="/leaderboard" target="_blank" rel="noreferrer">
+            BIG SCREEN ↗
+          </a>
+          <a href="/pose-lab" target="_blank" rel="noreferrer">
+            POSE LAB ↗
+          </a>
+        </nav>
         <span className="op-note">{new Date(now).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
       </header>
+      {!isLocal && (
+        <div className="op-banner font-mono">
+          PUBLIC SERVER: FEED, STANDINGS AND BOARD EDITS WORK HERE (SHARED DATABASE). THE MIRROR, ITS CONTROLS, SIGN-UPS AND OPEN MIRROR ONLY WORK ON THE
+          KIOSK LAPTOP. OPEN <b>LOCALHOST:3000/ADMIN</b> THERE.
+        </div>
+      )}
       <div className="op__grid">
         <div className="op__col">
           <Win title="MIRROR_NOW.EXE">
@@ -338,6 +456,9 @@ export function OperatorScreen() {
               ))}
             </div>
             <div className="op-note">{sent ?? "SENDS STRAIGHT TO THE MIRROR."}</div>
+          </Win>
+          <Win title="PHONE_QR.EXE">
+            <PhoneQr url={phoneUrl} />
           </Win>
         </div>
 
@@ -379,50 +500,66 @@ export function OperatorScreen() {
               {u?.mock ? "MOCK MODE (NO AI KEYS)" : `MODEL ${u?.model.toUpperCase() ?? "…"}`} · {snapshot?.store === "tiger" ? "TIGER DATA" : "IN-MEMORY"}
             </div>
           </Win>
-        </div>
-
-        <div className="op__col">
-          <Win title="STANDINGS.EXE">
-            {narrative?.squadChampion && (
-              <div className="op-special font-heading">
-                👑 SQUAD CHAMPION · {narrative.squadChampion.vibe.toUpperCase()} · {formatAura(narrative.squadChampion.score)}
-              </div>
-            )}
-            {narrative?.rivalry && <div className="op-note">⚔️ {rivalryLine(narrative.rivalry)}</div>}
-            <ol className="op-board">
-              {(snapshot?.top ?? []).slice(0, 12).map((e, i) => {
-                const streak = e.handle ? narrative?.streaks[e.handle] : undefined;
-                return (
-                  <li key={e.id} className="op-board__row">
-                    <span className="font-number op-board__rank">{i + 1}</span>
-                    <span className="op-board__who">
-                      {e.nickname}
-                      {e.handle ? <span className="op-dim"> · {handleName(e.handle)}</span> : null}
-                      {streak ? ` 🔥${streak}` : ""}
-                    </span>
-                    <span className="font-number op-glow">{formatAura(e.aura, true)}</span>
-                  </li>
-                );
-              })}
-              {snapshot && snapshot.top.length === 0 && <li className="op-note">NOBODY ON THE BOARD YET.</li>}
-            </ol>
-          </Win>
-          <Win title="NEWEST_CARDS.EXE">
-            <div className="op-cards">
-              {(feed.data?.entries ?? []).slice(0, 6).map((c) => (
+          <Win title={`FEED.EXE · ${feed.data?.entries.length ?? 0} CARDS`}>
+            <div className="op-cards op-cards--feed">
+              {(feed.data?.entries ?? []).map((c) => (
                 <a key={c.id} href={`/r/${c.id}`} target="_blank" rel="noreferrer" className="op-card">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={c.imageUrl} alt="" loading="lazy" />
                   <span className="op-card__title">{c.title}</span>
                   <span className="op-note">
+                    {ago(now - new Date(c.createdAt).getTime())} AGO ·{" "}
                     {Object.entries(c.reactions)
                       .filter(([, n]) => n > 0)
                       .map(([emoji, n]) => `${emoji}${n}`)
-                      .join(" ") || "NO REACTIONS YET"}
+                      .join(" ") || "NO REACTIONS"}
                   </span>
                 </a>
               ))}
+              {feed.data && feed.data.entries.length === 0 && <div className="op-note">NO CARDS YET.</div>}
             </div>
+          </Win>
+        </div>
+
+        <div className="op__col">
+          <Win title={editBoard ? "STANDINGS.EXE · EDIT" : "STANDINGS.EXE"}>
+            <div className="op-tabs">
+              <button type="button" className={`op-btn ${editBoard ? "" : "op-btn--go"}`} onClick={() => setEditBoard(false)}>
+                TOP 12
+              </button>
+              <button type="button" className={`op-btn ${editBoard ? "op-btn--go" : ""}`} onClick={() => setEditBoard(true)}>
+                EDIT / DELETE
+              </button>
+            </div>
+            {editBoard ? (
+              <BoardEditor adminKey={key} snapshot={snapshot} />
+            ) : (
+              <>
+                {narrative?.squadChampion && (
+                  <div className="op-special font-heading">
+                    👑 SQUAD CHAMPION · {narrative.squadChampion.vibe.toUpperCase()} · {formatAura(narrative.squadChampion.score)}
+                  </div>
+                )}
+                {narrative?.rivalry && <div className="op-note">⚔️ {rivalryLine(narrative.rivalry)}</div>}
+                <ol className="op-board">
+                  {(snapshot?.top ?? []).slice(0, 12).map((e, i) => {
+                    const streak = e.handle ? narrative?.streaks[e.handle] : undefined;
+                    return (
+                      <li key={e.id} className="op-board__row">
+                        <span className="font-number op-board__rank">{i + 1}</span>
+                        <span className="op-board__who">
+                          {e.nickname}
+                          {e.handle ? <span className="op-dim"> · {handleName(e.handle)}</span> : null}
+                          {streak ? ` 🔥${streak}` : ""}
+                        </span>
+                        <span className="font-number op-glow">{formatAura(e.aura, true)}</span>
+                      </li>
+                    );
+                  })}
+                  {snapshot && snapshot.top.length === 0 && <li className="op-note">NOBODY ON THE BOARD YET.</li>}
+                </ol>
+              </>
+            )}
           </Win>
         </div>
       </div>

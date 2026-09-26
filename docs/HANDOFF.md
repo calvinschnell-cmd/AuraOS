@@ -19,11 +19,11 @@ feed a phone companion site. Data lives in Tiger Data (TimescaleDB).
 | Screen | Where | What |
 | --- | --- | --- |
 | Mirror (user side) | kiosk laptop, portrait monitor, `http://localhost:3000/kiosk?mode=mirror` | The kiosk. Full screen in its own Chrome profile (`%LOCALAPPDATA%\AuraOS\chrome-mirror`). |
-| Operator (laptop) | `http://localhost:3000/operator` | Mirror status (what's on screen, camera, people in frame), sign-ups (walk-ins, CALL UP, remove), controls, OPEN MIRROR button, standings, today's stats, newest cards. Unlock with `ADMIN_KEY` (remembered in localStorage). |
+| Admin (laptop) | `http://localhost:3000/admin` | The one admin page (`/operator` and `/remote` redirect here): mirror status (what's on screen, camera, people in frame), OPEN MIRROR, controls, sign-ups (walk-ins, CALL UP, remove), live feed, standings with EDIT / DELETE, today's stats, phone QR (tap → full screen for judges). Unlock with `ADMIN_KEY` (remembered in localStorage). On the public server only the feed, standings, board edits and QR work (mirror state, controls and sign-ups are per server); a banner says so. |
 | Phones | https://www.aurafulos.tech (also https://aurafulos.tech, https://155-138-165-43.sslip.io) | `/feed`: card just scanned (react live) + FEED (last 30 min) and STANDINGS (top 10, tap → card) tabs. `/r/[id]`: a card (react, BEAT THIS SCORE → queue, THIS WAS ME → claim). `/u/[handle]`: shareable profile (every card tied to the AURA ID). `/leaderboard`: big-screen Tide Chart (its QR opens `/feed?tab=standings`). |
 
 Launch both screens: `npm run kiosk:launch` (mirror on the portrait display,
-operator on the main one). `npm run kiosk:launch -- -MirrorOnly` reopens only
+admin on the main one). `npm run kiosk:launch -- -MirrorOnly` reopens only
 the mirror; `-DryRun` prints the plan. The dashboard's OPEN MIRROR button runs
 the same launcher (`/api/operator/mirror`, Windows laptop only; refused while a
 mirror is reporting).

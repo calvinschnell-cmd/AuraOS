@@ -89,8 +89,7 @@ Open <http://localhost:3000>. The launcher links to every route. Setting up a fr
 | `/feed`             | Companion app: every saved card, newest first, with reactions        |
 | `/card/[id]`        | Old card links: redirects to `/r/[id]`                               |
 | `/leaderboard`      | Full-screen Tide Chart: squad champion, rivalry of the day, streaks, most improved |
-| `/remote`           | Operator remote (ADMIN_KEY): battle, squad, scan/capture, start, wave, reset, mute, mode |
-| `/admin`            | Paste ADMIN_KEY to delete leaderboard entries                       |
+| `/admin`            | The one admin page (ADMIN_KEY): mirror status, OPEN MIRROR, remote controls (battle, squad, scan/capture, start, wave, reset, mute, mode), sign-ups, live feed, standings with delete, today's stats, phone QR for judges. `/operator` and `/remote` redirect here. |
 | `/certificate/[id]` | Hidden print page (US Letter) opened by the kiosk when printing     |
 | `/pose-editor`      | Developer tool (hidden): joints, presets, animations, clothing, clipping |
 | `/pose-lab`         | Developer tool (hidden): live pose classifier read-out + labeled sample recorder |
@@ -118,7 +117,7 @@ See [`.env.example`](./.env.example).
 | `SOLANA_RPC_URL`                | Solana RPC (default devnet)                                    |
 | `SOLANA_BADGES_ENABLED`         | `true` to mint a badge per claimed card (never blocks the card) |
 | `SOLANA_SECRET_KEY`, `SOLANA_TREE`, `SOLANA_COLLECTION` | Hosted deploys: badge wallet + tree ids as env (else `.solana/` files) |
-| `ADMIN_KEY`                     | Shared secret for `/remote`, `/admin`, and admin API routes    |
+| `ADMIN_KEY`                     | Shared secret for `/admin` and the admin API routes           |
 | `PRINTING_ENABLED`              | `true` to print Aura Certificates (also toggleable in settings)|
 
 ## Aura Battles
@@ -402,7 +401,7 @@ and starts the scan.
 - [ ] `TIGER_DATABASE_URL` set and `npm run db:setup` prints the hypertables + `aura_15m`.
 - [ ] `npm run solana:setup` done (wallet funded), `SOLANA_BADGES_ENABLED=true`, a claimed card
       shows "AURA BADGE MINTED" and its explorer link opens.
-- [ ] `ADMIN_KEY` set (a long random string); `/remote` and `/admin` unlock with it.
+- [ ] `ADMIN_KEY` set (a long random string); `/admin` unlocks with it.
 - [ ] Deployed (Vultr) with the same env vars and `PUBLIC_BASE_URL` (card QR codes use it); a card QR opens `/r/[id]` from a phone, and `/feed` loads.
 - [ ] Optional: retrain the pose classifier with event-camera samples from `/pose-lab` (`npm run pose:train`).
 - [ ] Laptop: repo pulled, `npm run build && npm run start`, monitor rotated to portrait.
@@ -432,7 +431,7 @@ and starts the scan.
    peace nor two fists fill the ring until your whole fit is visible. Stand far back (body under
    ~30% of the frame height): "COME CLOSER", same block. In a two-person battle both people must
    be fully in frame, and it never falls back to scanning just one of them. `Space`, `B` and
-   `/remote` skip the check (operator override).
+   the `/admin` controls skip the check (operator override).
 9. **Aura Battle**: alone, hold up two fists: the 1v1 lobby opens ("PLAYER 1, STEP UP"). Double
    peace: 3-2-1 (strike a real pose, it is scored), the thumbnail locks into the left slot and
    your mannequin appears in your detected outfit. Player 2 does the same; VS slams in with both
@@ -450,8 +449,8 @@ and starts the scan.
 10. **Meltdown**: wave 6 times without scanning; each hi is flatter, then anger mark, sulk, recovery after you stop.
 11. **Idle**: walk away; results reset after 20s with nobody in frame, attract mode after 60s, comes back when you return.
 12. **Mirror mode**: switch with `T`; nothing is drawn over the reflection except the analysis panel.
-13. **Remote**: from a phone, `/remote` battle / squad / scan / start / wave / reset / mute / mode reach the kiosk.
-14. **Admin**: `/admin` deletes a leaderboard entry and the chart updates.
+13. **Remote**: `/admin` CONTROLS (battle / squad / scan / start / wave / reset / mute / mode) reach the kiosk.
+14. **Admin**: `/admin` STANDINGS → EDIT / DELETE removes a leaderboard entry and the chart updates.
 15. **Printing** (if enabled): thumbs up prints the certificate with no dialog; the mannequin
     presents proudly.
 16. **Errors**: pull the network; the system error window appears and the kiosk returns to READY.

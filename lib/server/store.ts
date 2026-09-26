@@ -441,7 +441,7 @@ interface Globals {
   challenges: Challenge[];
   /** Last "you're up" call from the operator (the mirror announces it). */
   called?: CalledChallenger | null;
-  /** What the mirror is showing (posted by the kiosk, read by /operator). */
+  /** What the mirror is showing (posted by the kiosk, read by /admin). */
   kioskStatus?: KioskStatus | null;
   store?: ScanStore;
   storeUrl?: string;

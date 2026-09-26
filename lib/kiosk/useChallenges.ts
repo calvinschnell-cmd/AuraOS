@@ -21,7 +21,7 @@ export interface CalledChallenger {
 
 /**
  * The challenger queue ("BEAT THIS SCORE" tapped on a shared card, or a
- * walk-in signed up at /operator): polled while the kiosk is at its mode
+ * walk-in signed up at /admin): polled while the kiosk is at its mode
  * select, so the mirror can call people up. `joinedTick` bumps when someone
  * new joins from a card (the announcer greets them); `calledTick` when the
  * operator calls someone up.

@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { RemoteScreen } from "@/components/remote/RemoteScreen";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "AURA OS // REMOTE" };
-
+/** The remote buttons live on the admin dashboard now. */
 export default function RemotePage() {
-  return <RemoteScreen />;
+  redirect("/admin");
 }

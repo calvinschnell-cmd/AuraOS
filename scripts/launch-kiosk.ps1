@@ -1,7 +1,7 @@
 # Opens both screens for the event (Windows):
 #   - the MIRROR: /kiosk?mode=mirror, full screen (Chrome kiosk mode) on the
 #     portrait monitor (or the first non-primary display),
-#   - the OPERATOR dashboard: /operator on the laptop's main display.
+#   - the ADMIN dashboard: /admin on the laptop's main display.
 # The server must already be running (npm run dev, or npm run build + npm run start,
 # and npm run ml for the garment segmenter).
 #
@@ -16,7 +16,7 @@ param(
   [string]$Base = "http://localhost:3000",
   # 1-based index into the display list printed below; 0 = pick the portrait monitor automatically.
   [int]$MirrorDisplay = 0,
-  # Reopen only the mirror (the operator dashboard is already open).
+  # Reopen only the mirror (the admin dashboard is already open).
   [switch]$MirrorOnly,
   # Print what would open, start nothing (debugging the dashboard button).
   [switch]$DryRun
@@ -77,8 +77,8 @@ Start-Process -FilePath $chrome -ArgumentList $mirrorArgs
 
 if (-not $MirrorOnly) {
   Start-Sleep -Milliseconds 800
-  Write-Host "  operator -> main display ($Base/operator)"
-  Start-Process -FilePath $chrome -ArgumentList @("--new-window", "$Base/operator")
+  Write-Host "  admin -> main display ($Base/admin)"
+  Start-Process -FilePath $chrome -ArgumentList @("--new-window", "$Base/admin")
 }
 
 Write-Host ""
