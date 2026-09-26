@@ -221,3 +221,49 @@ export function powerPose(s: PoseSnapshot): number {
   };
   return Math.min(side(LM.shoulderL, LM.elbowL, LM.wristL, LM.hipL), side(LM.shoulderR, LM.elbowR, LM.wristR, LM.hipR));
 }
+
+export type PhotoPoseKind = "peace" | "hands_together" | "look_away";
+
+/**
+ * Everyday photo poses (the ones people actually do for a pic): a hand up by
+ * the face (a peace sign, a wave at the camera), hands together in front of
+ * the body, or the head turned to look off to the side. Too few clean photos
+ * of these exist to train a class, so they are read from the geometry.
+ * Returns the strongest one (strength 0-1), or null.
+ */
+export function photoPose(s: PoseSnapshot): { kind: PhotoPoseKind; strength: number } | null {
+  const n = poseGeometry(s).norm; // hip-centered, y down, torso lengths (shoulders at y ~ -1)
+  const nose = n[LM.nose];
+  const shoulderY = (n[LM.shoulderL].y + n[LM.shoulderR].y) / 2;
+  const shoulderMidX = (n[LM.shoulderL].x + n[LM.shoulderR].x) / 2;
+  const shoulderW = Math.max(0.2, Math.abs(n[LM.shoulderL].x - n[LM.shoulderR].x));
+  const deg = (a: number, b: number, c: number) => (jointAngle(n[a], n[b], n[c]) * 180) / Math.PI;
+
+  // A hand up by the face, elbow bent (not an arm thrown straight up).
+  const byFace = (shoulder: number, elbow: number, wrist: number) => {
+    const w = n[wrist];
+    const near = unit((0.55 - Math.hypot(w.x - nose.x, w.y - nose.y)) / 0.25);
+    const raised = w.y < shoulderY + 0.1 ? 1 : 0;
+    const bent = deg(shoulder, elbow, wrist) < 125 ? 1 : 0;
+    return near * raised * bent;
+  };
+  const peace = Math.max(byFace(LM.shoulderL, LM.elbowL, LM.wristL), byFace(LM.shoulderR, LM.elbowR, LM.wristR));
+
+  // Hands together in front of the body, between the chest and the hips.
+  const wl = n[LM.wristL];
+  const wr = n[LM.wristR];
+  const midY = (wl.y + wr.y) / 2;
+  const together = unit((0.32 - Math.hypot(wl.x - wr.x, wl.y - wr.y)) / 0.14) * (midY > shoulderY + 0.15 && midY < 0.2 ? 1 : 0) * (Math.abs((wl.x + wr.x) / 2 - shoulderMidX) < 0.45 ? 1 : 0);
+
+  // Head turned: the nose sits well off the middle of the shoulders.
+  const turn = Math.abs(nose.x - shoulderMidX) / shoulderW;
+  const lookAway = unit((turn - 0.26) / 0.2);
+
+  const found: { kind: PhotoPoseKind; strength: number }[] = [
+    { kind: "peace", strength: peace },
+    { kind: "hands_together", strength: together },
+    { kind: "look_away", strength: lookAway },
+  ];
+  const best = found.sort((a, b) => b.strength - a.strength)[0];
+  return best.strength > 0 ? best : null;
+}

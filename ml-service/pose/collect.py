@@ -93,6 +93,18 @@ CATEGORIES: dict[str, list[str]] = {
         "dancer jumping",
         "contemporary dance performance",
     ],
+    # Everyday photo poses people actually do for a pic: walking and looking
+    # off to the side, hands together, a peace sign, a candid laugh.
+    "aesthetic": [
+        "street style photography walking",
+        "street style fashion week outside",
+        "peace sign pose",
+        "v sign hand gesture photo",
+        "woman posing hands together",
+        "candid street portrait walking",
+        "fashion blogger street style",
+        "posing for photo looking away",
+    ],
     "standing": [
         "full length portrait woman dress",
         "woman standing street fashion",

@@ -1,5 +1,5 @@
 import { predictArchetype, type PoseModel } from "./classifier";
-import { dynamismSignals, powerPose, type DynamismSignals } from "./features";
+import { dynamismSignals, photoPose, powerPose, type DynamismSignals, type PhotoPoseKind } from "./features";
 import type { PoseSnapshot } from "./landmarks";
 
 /**
@@ -15,9 +15,23 @@ export const ARCHETYPES = {
   action: { label: "ANIME PROTAGONIST", callout: "an anime protagonist pose", noun: "anime protagonist pose" },
   fighter: { label: "FIGHTING GAME SELECT", callout: "a fighting-game character-select pose", noun: "character-select pose" },
   dance: { label: "DANCE BREAK", callout: "a mid-dance-break pose", noun: "dance break" },
+  // Everyday photo poses: walking and looking off to the side, hands together, a peace sign.
+  aesthetic: { label: "MAIN CHARACTER", callout: "a main-character photo moment", noun: "main-character moment" },
   standing: { label: "NPC IDLE", callout: "an NPC idle animation", noun: "NPC idle animation" },
 } as const;
 export type ArchetypeId = keyof typeof ARCHETYPES;
+
+/** Archetypes read from the geometry (lib/pose/features.ts), not classifier classes. */
+export const RULE_ARCHETYPES = ["aesthetic"] as const;
+
+/** What the mirror calls each everyday photo pose. */
+const PHOTO_POSE_STANDOUT: Record<PhotoPoseKind, string> = {
+  peace: "HAND UP FOR THE PIC",
+  hands_together: "HANDS TOGETHER",
+  look_away: "LOOKING OFF CAMERA",
+};
+/** photoPose strength that counts. */
+export const PHOTO_POSE_MIN = 0.5;
 
 /** The low-energy baseline class: a stiff standing photo. */
 export const STIFF_ARCHETYPE: ArchetypeId = "standing";
@@ -81,15 +95,24 @@ export function scorePose(model: PoseModel, snapshot: PoseSnapshot | null, sourc
   // Fists on hips, elbows out: a hero stance even though nothing moves (see powerPose).
   const power = powerPose(snapshot);
   const isPower = power >= POWER_POSE_MIN;
-  const archetype = isPower ? "hero" : predicted;
-  const score = Math.round(Math.max(0, Math.min(1, isPower ? Math.max(raw, 0.6 + 0.2 * power) : raw)) * 100);
+  // Everyday photo poses (peace by the face, hands together, looking away): a solid,
+  // not huge, pose score, used when it beats what the body energy alone earned.
+  const photo = isPower ? null : photoPose(snapshot);
+  const photoScore = photo && photo.strength >= PHOTO_POSE_MIN ? 0.52 + 0.18 * photo.strength : 0;
+  const isPhoto = photo !== null && photoScore > raw;
+  const archetype = isPower ? "hero" : isPhoto ? "aesthetic" : predicted;
+  const score = Math.round(Math.max(0, Math.min(1, isPower ? Math.max(raw, 0.6 + 0.2 * power) : isPhoto ? photoScore : raw)) * 100);
   return {
     score,
     archetype,
     label: archetype === "unknown" ? prediction.archetype.toUpperCase() : ARCHETYPES[archetype].label,
-    match: isPower ? Math.max(Math.round(power * 100), predicted === "hero" ? Math.round(prediction.confidence * 100) : 0) : Math.round(prediction.confidence * 100),
+    match: isPower
+      ? Math.max(Math.round(power * 100), predicted === "hero" ? Math.round(prediction.confidence * 100) : 0)
+      : isPhoto
+        ? Math.round(photo.strength * 100)
+        : Math.round(prediction.confidence * 100),
     signals,
-    standout: isPower ? "SUPERHERO POWER POSE" : signals[loudest] >= 0.35 ? SIGNAL_LABELS[loudest] : null,
+    standout: isPower ? "SUPERHERO POWER POSE" : isPhoto ? PHOTO_POSE_STANDOUT[photo.kind] : signals[loudest] >= 0.35 ? SIGNAL_LABELS[loudest] : null,
     source,
   };
 }

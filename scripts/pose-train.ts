@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { predictArchetype, type PoseModel } from "../lib/pose/classifier";
 import { FEATURE_NAMES, poseFeatures } from "../lib/pose/features";
 import { isPoseSnapshot, mirrorSnapshot, type Landmark, type PoseSnapshot } from "../lib/pose/landmarks";
-import { ARCHETYPES } from "../lib/pose/score";
+import { ARCHETYPES, RULE_ARCHETYPES } from "../lib/pose/score";
 import { applyStandardizer, argmax, fitStandardizer, forward, knnPredict, metrics, stratifiedFolds, trainNetwork, type Dataset, type Metrics } from "../lib/pose/train";
 import { createRng } from "../lib/prng";
 
@@ -26,7 +26,8 @@ const SOURCES = [join(ROOT, "ml-service/pose/landmarks.jsonl"), join(ROOT, "ml-s
 const MODEL_OUT = join(ROOT, "lib/pose/model.json");
 const REPORT_OUT = join(ROOT, "ml-service/pose/REPORT.md");
 
-const CLASSES = Object.keys(ARCHETYPES);
+// Rule-based archetypes (detected from geometry in lib/pose/score.ts) are not classifier classes.
+const CLASSES = Object.keys(ARCHETYPES).filter((a) => !(RULE_ARCHETYPES as readonly string[]).includes(a));
 const FOLDS = 5;
 const SEED = "aura-pose-v1";
 const NOISE = 0.006;

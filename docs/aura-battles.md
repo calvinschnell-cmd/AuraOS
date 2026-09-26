@@ -27,6 +27,7 @@ Plex Mono, and no rounded corners.
 | Fit score + Pose score + combined total; can be won on pose | `computeOutcome` (`lib/battle/score.ts`): total = fit aura + `(pose - 40) × 2,500`; `decidedBy` = fit / pose / both. |
 | Commentary calls out pose when it decided it | The decision line in the prompt ("The POSE decided it: ..."), the mock line ("...but that pose sealed it"), and a DECIDED BY THE POSE stamp. |
 | Trained pose classifier (automated collection, automatic filtering, normalized angle features, weak-label classifier) | `ml-service/pose/collect.py` → `extract.py` → `scripts/pose-train.ts`; features `lib/pose/features.ts`; inference `lib/pose/classifier.ts`; results `ml-service/pose/REPORT.md`. |
+| Poses read straight from the geometry | Too few clean photos exist to train these, so `lib/pose/features.ts` detects them: the superhero power pose (`powerPose`: fists on hips, elbows out → HERO STANCE ~80) and everyday photo poses (`photoPose`: a hand up by the face / peace sign, hands together, looking off camera → MAIN CHARACTER, 52-70). They win only when they beat the body-energy score, so dynamic poses keep their class. |
 | Mirror-aware matching | Mirror augmentation in training + mirror-averaged prediction at battle time (`predictArchetype`). |
 | Named callout ("87% match to ...") | `PoseResult.label` / `match`, shown on the result, the card and in the commentary prompt (`describePose`). |
 

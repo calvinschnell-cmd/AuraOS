@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { predictArchetype, predictFeatures, softmax, type PoseModel } from "@/lib/pose/classifier";
-import { FEATURE_NAMES, dynamismSignals, jointAngle, poseFeatures, powerPose } from "@/lib/pose/features";
+import { FEATURE_NAMES, dynamismSignals, jointAngle, photoPose, poseFeatures, powerPose } from "@/lib/pose/features";
 import { LANDMARK_COUNT, compactSnapshot, isPoseSnapshot, mirrorSnapshot, snapshotFromMediapipe, type PoseSnapshot } from "@/lib/pose/landmarks";
 import { POSE_MODEL, modelMatchesFeatures } from "@/lib/pose/model";
 import { NO_POSE_SCORE, POSE_AURA_PER_POINT, POSE_NEUTRAL, describePose, dynamism, poseAura, scorePose } from "@/lib/pose/score";
@@ -162,5 +162,46 @@ describe("superhero power pose", () => {
     expect(powerPose(skeletonSnapshot(MOCK_POSES.dance))).toBe(0);
     const oneHand = { ...MOCK_POSES.hero, right: MOCK_POSES.standing.right };
     expect(powerPose(skeletonSnapshot(oneHand))).toBe(0);
+  });
+});
+
+describe("everyday photo poses (MAIN CHARACTER)", () => {
+  const standing = () => skeletonSnapshot(MOCK_POSES.standing);
+  const move = (s: PoseSnapshot, i: number, x: number, y: number): PoseSnapshot => ({ ...s, landmarks: s.landmarks.map((p, j) => (j === i ? [x, y, p[2], p[3]] : p)) as PoseSnapshot["landmarks"] });
+  const at = (s: PoseSnapshot, i: number) => ({ x: s.landmarks[i][0], y: s.landmarks[i][1] });
+  const elbowUp = (s: PoseSnapshot, elbow: number, shoulder: number) => move(s, elbow, at(s, shoulder).x + (at(s, elbow).x - at(s, shoulder).x) * 1.4, at(s, shoulder).y + 0.02);
+
+  it("plain standing is not a photo pose", () => {
+    expect(photoPose(standing())?.strength ?? 0).toBeLessThan(0.5);
+    expect(scorePose(POSE_MODEL, standing()).archetype).toBe("standing");
+  });
+
+  it("reads a hand up by the face (peace sign)", () => {
+    let s = standing();
+    const nose = at(s, 0);
+    s = elbowUp(s, 14, 12);
+    s = move(s, 16, nose.x + 0.03, nose.y + 0.02);
+    const p = photoPose(s);
+    expect(p?.kind).toBe("peace");
+    const r = scorePose(POSE_MODEL, s);
+    expect(r.archetype).toBe("aesthetic");
+    expect(r.label).toBe("MAIN CHARACTER");
+    expect(r.score).toBeGreaterThanOrEqual(52);
+    expect(r.score).toBeLessThanOrEqual(70);
+  });
+
+  it("reads hands together in front of the body", () => {
+    let s = standing();
+    const chest = { x: (at(s, 11).x + at(s, 12).x) / 2, y: (at(s, 11).y + at(s, 23).y) / 2 };
+    s = move(s, 15, chest.x + 0.01, chest.y);
+    s = move(s, 16, chest.x - 0.01, chest.y);
+    expect(photoPose(s)?.kind).toBe("hands_together");
+  });
+
+  it("reads the head turned to look off camera", () => {
+    let s = standing();
+    const shoulderW = Math.abs(at(s, 11).x - at(s, 12).x);
+    s = move(s, 0, at(s, 0).x + shoulderW * 0.5, at(s, 0).y);
+    expect(photoPose(s)?.kind).toBe("look_away");
   });
 });
