@@ -5,16 +5,17 @@ import { getScanStore } from "@/lib/server/store";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "AURA OS · FEED",
-  description: "Every Aura Battle and scan from the AURA OS mirror at HackGT 13.",
+  title: "AURA OS · LIVE",
+  description: "The latest scan, every card and the live standings from the AURA OS mirror at HackGT 13.",
 };
 
 const PAGE = 20;
 
-/** Companion app: the public feed of saved cards (react, open, beat the score). */
-export default async function FeedPage() {
+/** Companion app: the card just scanned, the feed of saved cards, and the live standings (?tab=standings). */
+export default async function FeedPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams;
   const entries = await getScanStore()
     .feed(PAGE)
     .catch(() => []);
-  return <FeedScreen initial={entries} initialNext={entries.length === PAGE ? entries[entries.length - 1].createdAt : null} />;
+  return <FeedScreen initial={entries} initialNext={entries.length === PAGE ? entries[entries.length - 1].createdAt : null} initialTab={tab === "standings" ? "standings" : "feed"} />;
 }

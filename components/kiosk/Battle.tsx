@@ -44,7 +44,13 @@ export function ModeSelectWindow({ onChoose, challengers = [] }: { onChoose: (ch
           <span className="font-heading">UP NEXT</span>
           {challengers.slice(0, 3).map((c) => (
             <span key={c.id} className="mode-select__challenger font-mono">
-              {c.name.toUpperCase()} · TO BEAT <span className="font-number">{formatAura(c.target)}</span>
+              {c.name.toUpperCase()}
+              {c.target ? (
+                <>
+                  {" "}
+                  · TO BEAT <span className="font-number">{formatAura(c.target)}</span>
+                </>
+              ) : null}
             </span>
           ))}
         </div>

@@ -2,6 +2,7 @@ import type { TokenUsage } from "@/lib/analyze";
 import { DAILY_SCAN_CAP, OPENAI_INPUT_USD_PER_M, OPENAI_MODEL, OPENAI_OUTPUT_USD_PER_M } from "@/lib/config";
 import { isMockMode } from "@/lib/env";
 import type { HottestHour, JudgeSplit, LeaderboardEntry, PlayerHistory, PlayerInfo, RemoteCommand, StoreKind, TimelineBucket, UsageStats } from "@/lib/kiosk/types";
+import type { KioskStatus } from "@/lib/kiosk/status";
 import { makeHandle, newHandleCode } from "@/lib/players";
 import type { Analysis } from "@/lib/schema";
 import { NEAR_ZERO_MAX, type JudgeId, type ScoreBreakdown } from "@/lib/scoring";
@@ -112,6 +113,11 @@ export interface ScanStore {
   entryForScan(scanId: string): Promise<LeaderboardEntry | null>;
   leaderboard(limit: number): Promise<LeaderboardEntry[]>;
   recentEntries(limit: number): Promise<LeaderboardEntry[]>;
+  /**
+   * The card to open for each scan (scan id -> card id): its own card (solo, or
+   * a squad member's personal card) first, else the battle card it was in.
+   */
+  cardIdsForScans(scanIds: string[]): Promise<Record<string, string>>;
   deleteEntry(id: string): Promise<boolean>;
 
   insertBattle(battle: StoredBattle): Promise<void>;
@@ -265,6 +271,18 @@ export class MemoryStore implements ScanStore {
   async recentEntries(limit: number) {
     return [...this.s.entries].reverse().slice(0, limit);
   }
+  async cardIdsForScans(scanIds: string[]) {
+    const out: Record<string, string> = {};
+    const newest = [...this.s.cards].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    for (const scanId of scanIds) {
+      const own = newest.find((c) => c.scanId === scanId);
+      const battle = own ? null : this.s.battles.find((b) => b.players.some((p) => p.scanId === scanId));
+      const battleCard = battle ? newest.find((c) => c.battleId === battle.id && c.parentId === null) : null;
+      const id = own?.id ?? battleCard?.id;
+      if (id) out[scanId] = id;
+    }
+    return out;
+  }
   async deleteEntry(id: string) {
     const i = this.s.entries.findIndex((e) => e.id === id);
     if (i < 0) return false;
@@ -398,6 +416,10 @@ interface Globals {
   usage: UsageState;
   remote: { cursor: number; commands: RemoteCommand[] };
   challenges: Challenge[];
+  /** Last "you're up" call from the operator (the mirror announces it). */
+  called?: CalledChallenger | null;
+  /** What the mirror is showing (posted by the kiosk, read by /operator). */
+  kioskStatus?: KioskStatus | null;
   store?: ScanStore;
   storeUrl?: string;
 }
@@ -423,11 +445,15 @@ globals.memory.battles = globals.memory.battles.filter((b) => Array.isArray((b a
 globals.memory.cards = globals.memory.cards.filter((c) => typeof (c as Partial<StoredCard>).kind === "string");
 globals.remote ??= { cursor: 0, commands: [] };
 globals.challenges ??= [];
+globals.called ??= null;
+globals.kioskStatus ??= null;
 
 /** Tiger Data when TIGER_DATABASE_URL is set, else memory. Rebuilt when the URL changes (dev .env reloads). */
 export function getScanStore(): ScanStore {
   const url = process.env.TIGER_DATABASE_URL?.trim() ?? "";
-  if (globals.store && globals.storeUrl === url) return globals.store;
+  // Reuse the instance unless the URL changed, or dev hot reload replaced the class it was built from.
+  const current = globals.store && (url ? globals.store instanceof TigerStore : globals.store instanceof MemoryStore);
+  if (globals.store && current && globals.storeUrl === url) return globals.store;
   globals.storeUrl = url;
   globals.store = url ? new TigerStore(getTigerPool(url)) : new MemoryStore(globals.memory);
   return globals.store;
@@ -502,6 +528,46 @@ export interface Challenge {
   target: number;
   cardId: string;
   at: number;
+}
+
+/** The operator called someone up: the mirror says their name once. */
+export interface CalledChallenger {
+  seq: number;
+  name: string;
+  target: number;
+  at: number;
+}
+let callSeq = 0;
+
+/** Drop an entry (the operator's remove button). */
+export function removeChallenge(id: number): boolean {
+  const queue = liveChallenges();
+  const i = queue.findIndex((c) => c.id === id);
+  if (i < 0) return false;
+  queue.splice(i, 1);
+  return true;
+}
+
+/** Call someone up: out of the queue, and the mirror announces them. */
+export function callChallenge(id: number): CalledChallenger | null {
+  const queue = liveChallenges();
+  const i = queue.findIndex((c) => c.id === id);
+  if (i < 0) return null;
+  const [c] = queue.splice(i, 1);
+  globals.called = { seq: ++callSeq, name: c.name, target: c.target, at: Date.now() };
+  return globals.called;
+}
+
+export function lastCalled(): CalledChallenger | null {
+  return globals.called ?? null;
+}
+
+export function setKioskStatus(status: KioskStatus): void {
+  globals.kioskStatus = status;
+}
+
+export function getKioskStatus(): KioskStatus | null {
+  return globals.kioskStatus ?? null;
 }
 
 /** A challenge stays in the queue this long (then they probably wandered off). */

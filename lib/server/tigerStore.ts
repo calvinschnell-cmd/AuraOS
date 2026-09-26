@@ -254,6 +254,21 @@ export class TigerStore implements ScanStore {
     const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries ORDER BY created_at DESC LIMIT $1`, [limit]);
     return rows.map(toEntry);
   }
+  async cardIdsForScans(scanIds: string[]) {
+    if (scanIds.length === 0) return {};
+    // Own card first (solo, or a squad member's personal card), else the battle card they were in.
+    const { rows } = await (await this.db()).query<{ scan_id: string; card_id: string }>(
+      `SELECT DISTINCT ON (scan_id) scan_id, card_id FROM (
+         SELECT scan_id, id AS card_id, created_at, 0 AS pri FROM cards WHERE scan_id = ANY($1::uuid[])
+         UNION ALL
+         SELECT bp.scan_id, c.id AS card_id, c.created_at, 1 AS pri
+           FROM battle_players bp JOIN cards c ON c.battle_id = bp.battle_id AND c.parent_id IS NULL
+          WHERE bp.scan_id = ANY($1::uuid[])
+       ) found ORDER BY scan_id, pri, created_at DESC`,
+      [scanIds],
+    );
+    return Object.fromEntries(rows.map((r) => [r.scan_id, r.card_id]));
+  }
   async deleteEntry(id: string) {
     if (!isUuid(id)) return false;
     const { rowCount } = await (await this.db()).query(`DELETE FROM leaderboard_entries WHERE id = $1`, [id]);

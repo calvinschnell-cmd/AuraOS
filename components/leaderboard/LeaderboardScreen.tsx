@@ -18,8 +18,8 @@ export function LeaderboardScreen({ publicBaseUrl = null }: { publicBaseUrl?: st
   const { snapshot, kingTick, error } = useLeaderboard(4000);
   const [qr, setQr] = useState<string | null>(null);
   useEffect(() => {
-    const { origin, pathname, search } = window.location;
-    makeQrDataUrl(`${publicBaseUrl ?? origin}${pathname}${search}`, 480).then(setQr).catch(() => setQr(null));
+    // Phones open the live standings (tap a row for that card), not this big-screen page.
+    makeQrDataUrl(`${publicBaseUrl ?? window.location.origin}/feed?tab=standings`, 480).then(setQr).catch(() => setQr(null));
   }, [publicBaseUrl]);
 
   const top = snapshot?.top ?? [];
@@ -92,7 +92,7 @@ export function LeaderboardScreen({ publicBaseUrl = null }: { publicBaseUrl?: st
             <div className="os-window__body flex flex-col items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {qr ? <img src={qr} alt="QR code to this leaderboard" className="lb__qr-img" /> : <div className="qr-placeholder" />}
-              <div className="font-heading text-[10px] uppercase">SCAN FOR THE LIVE CHART</div>
+              <div className="font-heading text-[10px] uppercase">SCAN FOR STANDINGS + CARDS</div>
             </div>
           </section>
           {snapshot && snapshot.timeline.length > 0 && (

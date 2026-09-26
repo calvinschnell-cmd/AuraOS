@@ -250,6 +250,8 @@ export interface LeaderboardEntry {
   standout: string | null;
   /** Player handle (NAME#CODE) when they typed a name, for their history page. */
   handle: string | null;
+  /** Their card (/r/[id]) when one was saved: the phone standings open it. */
+  cardId?: string | null;
 }
 
 /** Where scans live: Tiger Data (TimescaleDB) or this server's memory. */

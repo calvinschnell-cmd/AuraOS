@@ -6,13 +6,13 @@ const STORAGE = "aura-os.admin-key";
 
 function savedKey(): string {
   try {
-    return sessionStorage.getItem(STORAGE) ?? "";
+    return localStorage.getItem(STORAGE) ?? "";
   } catch {
     return "";
   }
 }
 
-/** Operator key kept for the tab session; verified against the server. */
+/** Operator key remembered on this device (the operator laptop); verified against the server. */
 export function useAdminKey() {
   const [key, setKey] = useState(savedKey);
   const [verified, setVerified] = useState(false);
@@ -27,7 +27,7 @@ export function useAdminKey() {
         setVerified(true);
         setError(null);
         try {
-          sessionStorage.setItem(STORAGE, k);
+          localStorage.setItem(STORAGE, k);
         } catch {
           // ignore
         }

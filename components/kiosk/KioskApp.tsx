@@ -20,6 +20,8 @@ import { useCamera } from "@/lib/kiosk/useCamera";
 import { useBattleAnnouncer } from "@/lib/kiosk/useBattleAnnouncer";
 import { useCardClaim } from "@/lib/kiosk/useCardClaim";
 import { useChallenges } from "@/lib/kiosk/useChallenges";
+import { buildKioskStatus } from "@/lib/kiosk/status";
+import { useKioskStatusReporter } from "@/lib/kiosk/useKioskStatusReporter";
 import { useVoicePrompts } from "@/lib/kiosk/useVoicePrompts";
 import { useFullscreen } from "@/lib/kiosk/useFullscreen";
 import { useGestures } from "@/lib/kiosk/useGestures";
@@ -234,12 +236,35 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
   }, [session.card, sound]);
 
   // A friend tapped "BEAT THIS SCORE" on a shared card: call them up.
+  // (Walk-ins the operator signs up join quietly; they get called by name.)
   useEffect(() => {
     const c = challenges.newest;
-    if (challenges.joinedTick === 0 || !c) return;
+    if (challenges.joinedTick === 0 || !c || c.target === 0) return;
     sound.chime();
     announcer.sayPremium([`${c.name} wants to beat ${formatAura(c.target)}.`, "Step up to the mirror."]);
   }, [challenges.joinedTick, challenges.newest, announcer, sound]);
+
+  // The operator called someone up from the dashboard.
+  useEffect(() => {
+    const c = challenges.called;
+    if (challenges.calledTick === 0 || !c) return;
+    sound.chime();
+    announcer.sayPremium([`${c.name}! You're up.`, c.target ? `Beat ${formatAura(c.target)}. Step up to the mirror.` : "Step up to the mirror."]);
+  }, [challenges.calledTick, challenges.called, announcer, sound]);
+
+  // Tell the operator dashboard what the mirror is showing (on change + a heartbeat).
+  useKioskStatusReporter(
+    buildKioskStatus({
+      state,
+      session,
+      mode,
+      muted: settings.muted,
+      camera: camera.status,
+      people: gestures.debug.personCount,
+      framing: gestures.debug.framing,
+      scansToday: machine.scansToday,
+    }),
+  );
 
   const onSlotLock = useCallback((i: number) => sound.tick(i), [sound]);
 

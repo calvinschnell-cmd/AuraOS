@@ -24,7 +24,10 @@ export async function GET(): Promise<NextResponse> {
     const handles = [...new Set(top.map((e) => e.handle).filter((h): h is string => h !== null))];
     const entries = await store.entriesForHandles(handles);
     const narrative = buildNarrative(battles, entries);
-    const body: LeaderboardSnapshot = { top, recent, totalToday, store: store.kind, timeline, hottestHour, judgeSplit, narrative, at: Date.now() };
+    // Each row links to its card (phone standings, operator dashboard).
+    const cards = await store.cardIdsForScans([...new Set([...top, ...recent].map((e) => e.scanId))]).catch(() => ({}) as Record<string, string>);
+    const withCard = (e: (typeof top)[number]) => ({ ...e, cardId: cards[e.scanId] ?? null });
+    const body: LeaderboardSnapshot = { top: top.map(withCard), recent: recent.map(withCard), totalToday, store: store.kind, timeline, hottestHour, judgeSplit, narrative, at: Date.now() };
     return NextResponse.json(body);
   } catch (err) {
     console.error("[aura] leaderboard failed", err);

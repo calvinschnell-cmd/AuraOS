@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AdminKeyGate, useAdminKey } from "@/components/admin/AdminKeyGate";
 import type { RemoteCommandName } from "@/lib/kiosk/types";
 
-const BUTTONS: { command: RemoteCommandName; label: string; emoji: string }[] = [
+export const REMOTE_BUTTONS: { command: RemoteCommandName; label: string; emoji: string }[] = [
   { command: "battle", label: "AURA BATTLE", emoji: "⚔️" },
   { command: "squad", label: "SQUAD", emoji: "👥" },
   { command: "scan", label: "SCAN / CAPTURE", emoji: "✌️✌️" },
@@ -39,7 +39,7 @@ export function RemoteScreen() {
           ) : (
             <>
               <div className="remote__grid">
-                {BUTTONS.map((b) => (
+                {REMOTE_BUTTONS.map((b) => (
                   <button key={b.command} type="button" className="remote__button" onClick={() => sendCommand(b.command)}>
                     <span className="remote__emoji" aria-hidden>
                       {b.emoji}
