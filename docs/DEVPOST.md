@@ -39,12 +39,13 @@ UP NEXT and calls them up by name. The leaderboard tells the day's story: Rivalr
 - **Fit judging**: a local segformer garment segmenter (CUDA sidecar) feeds GPT-4o-mini structured
   outputs; solo scans add Gemini as a second, independent judge. Battles use a single fast judge
   per capture, scored the instant each player captures, so the wait hides under the VS animation.
-- **Pose judging (trained)**: we collected ~800 freely licensed photos from Wikimedia Commons by
+- **Pose judging (trained)**: we collected 1,380 freely licensed photos from Wikimedia Commons by
   searching six archetype categories (runway, superhero, anime/cosplay action, martial arts, dance,
-  plain standing), ran MediaPipe over all of them, filtered automatically (no person, crowds,
-  unconfident joints), and trained a small MLP on normalized joint-angle features with the search
-  category as a weak label (315 photos survived the filters; 5-fold cross-validated accuracy
-  about 3x chance). It scores a pose in well under a millisecond on the server: no model call at
+  plain standing; a second pass added ballet, cheer, K-pop, women's cosplay and fashion searches
+  the first set was thin on), ran MediaPipe over all of them, filtered automatically (no person,
+  crowds, unconfident joints), and trained a small MLP on normalized joint-angle features with the
+  search category as a weak label (500 photos survived the filters; 5-fold cross-validated
+  accuracy 46%, about 3x chance). It scores a pose in well under a millisecond on the server: no model call at
   battle time.
 - **Commentary**: one text-only, token-capped, streamed completion built from every player's score
   sheet.

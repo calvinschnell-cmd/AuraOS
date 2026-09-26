@@ -25,7 +25,7 @@ to the code). Devpost write-up draft: [docs/DEVPOST.md](./docs/DEVPOST.md).
 Next.js (App Router) · TypeScript · Tailwind v4 · Three.js · MediaPipe Tasks Vision ·
 Two AI judges: OpenAI `gpt-4o-mini` + Google Gemini 2.5 Flash (structured outputs) · local
 segformer garment segmentation (Python FastAPI sidecar on CUDA) · a pose-archetype classifier
-(MLP trained on MediaPipe landmarks from ~800 Wikimedia Commons photos) · Tiger Data (TimescaleDB) ·
+(MLP trained on MediaPipe landmarks from 1,380 Wikimedia Commons photos) · Tiger Data (TimescaleDB) ·
 ElevenLabs voice · Solana compressed-NFT badges (Metaplex Bubblegum, devnet) · zod · Vitest
 
 ## Local setup
