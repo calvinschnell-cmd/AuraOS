@@ -121,6 +121,8 @@ export async function createImageSegmenter(runningMode: "IMAGE" | "VIDEO"): Prom
 /** Pose landmark indexes we use. */
 export const POSE_LEFT_SHOULDER = 11;
 export const POSE_RIGHT_SHOULDER = 12;
+export const POSE_LEFT_HIP = 23;
+export const POSE_RIGHT_HIP = 24;
 export const POSE_LEFT_WRIST = 15;
 export const POSE_RIGHT_WRIST = 16;
 

@@ -108,6 +108,24 @@ describe("gesture engine", () => {
     expect(events).toEqual([]);
   });
 
+  it("only ends the session with a palm raised above the waist", () => {
+    // Shoulders at 0.3, hips at 0.7: the waistline sits at 0.3 + 0.7 * 0.4 = 0.58.
+    const palmAt = (wristY: number) => {
+      const e = new GestureEngine();
+      const events: GestureEvent[] = [];
+      for (let t = 0; t <= 2000; t += 66) {
+        events.push(
+          ...e.update({ t, hands: [{ ...hand("Open_Palm", 0.5), wristY }], poses: [{ wrists: [{ x: 0.5, y: wristY }], shoulderY: 0.3, hipY: 0.7 }], mirrored: true }, RESULT),
+        );
+      }
+      return events;
+    };
+    expect(palmAt(0.72)).toEqual([]); // hanging relaxed at the hips
+    expect(palmAt(0.62)).toEqual([]); // just below the waist
+    expect(palmAt(0.45)).toEqual([{ type: "open_palm" }]); // raised to the chest
+    expect(palmAt(0.2)).toEqual([{ type: "open_palm" }]); // up high
+  });
+
   it("enters a refractory period after firing", () => {
     const e = new GestureEngine();
     const hands = [hand("Victory", 0.4, "Left"), hand("Victory", 0.6, "Right")];

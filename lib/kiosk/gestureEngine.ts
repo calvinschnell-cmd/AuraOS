@@ -48,6 +48,8 @@ export interface PoseObservation {
   facing?: boolean;
   /** Mean shoulder height, normalized 0-1 (y grows downward). Missing: the raised-hand check is skipped. */
   shoulderY?: number;
+  /** Mean hip height, normalized 0-1. With shoulderY it places the waist for the end-session palm. */
+  hipY?: number;
 }
 
 export interface ObservationFrame {
@@ -95,6 +97,12 @@ export interface EngineConfig {
   waveRefractoryMs: number;
   /** A waving wrist may sit at most this far below the shoulders (normalized y). */
   waveRaiseMargin: number;
+  /**
+   * The end-session palm only counts above the waist: this far from the
+   * shoulders down to the hips (0.7 = the waistline). Relaxed hands hang at
+   * hip height and never end a session.
+   */
+  palmWaistFraction: number;
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -114,7 +122,14 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   waveMinTravel: 0.06,
   waveRefractoryMs: 2500,
   waveRaiseMargin: 0.03,
+  palmWaistFraction: 0.7,
 };
+
+/** Wrist above the person's waist (unknown body: counts, so a pose-tracker dropout never blocks the palm). */
+function aboveWaist(h: HandObservation, pose: PoseObservation | undefined, fraction: number): boolean {
+  if (pose?.shoulderY === undefined || pose.hipY === undefined || pose.hipY <= pose.shoulderY) return true;
+  return h.wristY < pose.shoulderY + fraction * (pose.hipY - pose.shoulderY);
+}
 
 /** A confident open palm: the only thing that can start a wave track. */
 function isOpenPalm(h: HandObservation, palmScore: number): boolean {
@@ -250,7 +265,7 @@ export class GestureEngine {
       }
       if (h.gesture === "Thumb_Up" && h.score >= c.thumbScore) thumbUp = true;
       if (h.gesture === "Thumb_Down" && h.score >= c.thumbScore) thumbDown = true;
-      if (h.gesture === "Open_Palm" && h.score >= c.palmScore) openPalm = true;
+      if (h.gesture === "Open_Palm" && h.score >= c.palmScore && aboveWaist(h, frame.poses[personOf[i]], c.palmWaistFraction)) openPalm = true;
     });
     const framed = (person: number) => frame.poses[person]?.framed ?? true;
     const facing = (person: number) => frame.poses[person]?.facing ?? true;

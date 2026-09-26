@@ -290,7 +290,7 @@ export const GESTURE_LEGEND: Record<GestureId, { emoji: string; label: string }>
   wave: { emoji: "👋", label: "WAVE: SAY HI" },
   thumb_up: { emoji: "👍", label: "THUMBS UP: CLAIM CARD" },
   thumb_down: { emoji: "👎", label: "THUMBS DOWN: ROAST ME" },
-  open_palm: { emoji: "✋", label: "PALM: END SESSION" },
+  open_palm: { emoji: "✋", label: "RAISED PALM: END SESSION" },
 };
 
 /** State-specific wording for a legend chip (the same gesture means different things per screen). */

@@ -9,7 +9,7 @@ import { SHAPE_CONFIDENCE, classifyHandShape, handExtent } from "./handShape";
 import { GestureEngine, allowedGestures, type EngineDebug, type EngineGesture, type ObservationFrame, type Progress } from "./gestureEngine";
 import { gestureEvent, gesturesForState, gesturesIgnored, isIdleState } from "./machine";
 import type { CameraRotation, KioskEvent, KioskState } from "./types";
-import { POSE_LEFT_SHOULDER, POSE_LEFT_WRIST, POSE_RIGHT_SHOULDER, POSE_RIGHT_WRIST, createGestureRecognizer, createPoseLandmarker } from "./vision";
+import { POSE_LEFT_HIP, POSE_LEFT_SHOULDER, POSE_LEFT_WRIST, POSE_RIGHT_HIP, POSE_RIGHT_SHOULDER, POSE_RIGHT_WRIST, createGestureRecognizer, createPoseLandmarker } from "./vision";
 
 export type GestureStatus = "off" | "loading" | "running" | "error";
 
@@ -355,6 +355,7 @@ export function useGestures(opts: GestureOptions): GestureRuntime {
             framed: lastPoseFramings[i] === "full",
             facing: isFacingCamera(lm),
             shoulderY: lm[POSE_LEFT_SHOULDER] && lm[POSE_RIGHT_SHOULDER] ? (lm[POSE_LEFT_SHOULDER].y + lm[POSE_RIGHT_SHOULDER].y) / 2 : undefined,
+            hipY: lm[POSE_LEFT_HIP] && lm[POSE_RIGHT_HIP] ? (lm[POSE_LEFT_HIP].y + lm[POSE_RIGHT_HIP].y) / 2 : undefined,
           }));
           lastAnchors = pr.landmarks.map((lm) => poseHandAnchors(lm));
           lastBoxes = pr.landmarks.map((lm) => {
