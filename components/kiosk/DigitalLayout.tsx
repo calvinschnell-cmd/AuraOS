@@ -27,6 +27,7 @@ import {
   NameEntryWindow,
   RoastWindow,
   SoloBattleWindow,
+  PhoneScanWindow,
   SystemErrorWindow,
   TideChartWindow,
 } from "./StateWindows";
@@ -146,6 +147,7 @@ export function DigitalLayout(p: KioskViewProps) {
                   <Terminal entries={p.terminal} maxLines={7} />
                 </OsWindow>
               )}
+              {idle && p.phoneScan && <PhoneScanWindow qr={p.phoneScan.qr} url={p.phoneScan.url} />}
               {idle && <TideChartWindow snapshot={p.leaderboard.snapshot} kingTick={p.leaderboard.kingTick} />}
             </aside>
 

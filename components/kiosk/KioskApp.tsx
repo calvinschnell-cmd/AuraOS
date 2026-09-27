@@ -11,6 +11,7 @@ import { auraCallout, useAnnouncer } from "@/lib/kiosk/announcer";
 import { analyzeFrame, fetchRoast, fetchUsageStats } from "@/lib/kiosk/api";
 import { captureLobby, createBattle, scoreCapture, streamCommentary, warmUp } from "@/lib/kiosk/battle";
 import { isIdleState } from "@/lib/kiosk/machine";
+import { makeKioskQrDataUrl } from "@/lib/kiosk/qr";
 import type { PoseSnapshot } from "@/lib/pose/landmarks";
 import { MeltdownTracker } from "@/lib/kiosk/meltdown";
 import { useKioskMusic } from "@/lib/kiosk/music";
@@ -296,6 +297,19 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
   // ---- share card claim (thumbs up)
   const { cardProps, cardRef } = useCardClaim({ state, session, send, printingEnabled: settings.printingEnabled, publicBaseUrl });
 
+  // Idle screen QR to phone scans (/scan) on the public site.
+  const [phoneScan, setPhoneScan] = useState<{ qr: string; url: string } | null>(null);
+  useEffect(() => {
+    const url = `${publicBaseUrl ?? window.location.origin}/scan`;
+    let cancelled = false;
+    void makeKioskQrDataUrl(url).then((qr) => {
+      if (!cancelled) setPhoneScan({ qr, url });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicBaseUrl]);
+
   // Thumbs down: fetch one extra roast for the current scan.
   const { scan, roastCount, roast } = session;
   useEffect(() => {
@@ -473,6 +487,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
     send: sendWithMeltdown,
     chooseMode,
     challengers: challenges.queue,
+    phoneScan,
     reboot,
     quickBoot: machine.quickBoot,
     onBootDone,

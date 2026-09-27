@@ -5,7 +5,7 @@ import type { ShareCardProps } from "@/components/card/ShareCardView";
 import { blurFace, grainDataUrl, renderCardNode } from "@/lib/card/render";
 import { mintBadge } from "./api";
 import { battleCardMeta, metaForm, scanCardMeta, squadMemberMeta, type CardMeta } from "./cardJobs";
-import { makeQrDataUrl } from "./qr";
+import { makeKioskQrDataUrl, makeQrDataUrl } from "./qr";
 import { printCertificate } from "./print";
 import type { BattleResult, CardResponse, KioskEvent, KioskState, SessionState } from "./types";
 
@@ -136,7 +136,9 @@ export function useCardClaim(opts: { state: KioskState; session: SessionState; s
         if (!res.ok || !body || body.error) throw new Error(body?.error ?? "CARD COULD NOT BE SAVED.");
         if (cancelled) return;
         if (job.primary) {
-          send({ type: "CARD_READY", card: { id: body.id, url: body.url, pageUrl: job.props.pageUrl, qrDataUrl: job.props.qr, kind: job.props.kind } });
+          // The on-screen QR is its own: black on white, big modules, readable through the acrylic.
+          const screenQr = await makeKioskQrDataUrl(job.props.pageUrl).catch(() => job.props.qr);
+          send({ type: "CARD_READY", card: { id: body.id, url: body.url, pageUrl: job.props.pageUrl, qrDataUrl: screenQr, kind: job.props.kind } });
           // Solana badge: a bonus layered on top of the saved card. Fire and forget.
           if (job.props.kind === "scan") {
             send({ type: "BADGE", badge: { status: "minting" } });

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { parseSquadCommentary } from "@/lib/battle/commentary";
+import { clientId } from "@/lib/companion/identity";
 import { playerLabel } from "@/lib/battle/score";
 import type { FeedDetail } from "@/lib/feed/types";
 import { historyPath } from "@/lib/players";
@@ -13,8 +14,6 @@ import { DecodeNumber } from "./DecodeNumber";
 import { IdentityForm, useIdentity } from "./Identity";
 import { Reactions } from "./Reactions";
 
-const noSubscribe = () => () => {};
-
 const KIND_LABEL = { scan: "SOLO SCAN", battle: "AURA BATTLE", squad: "SQUAD BATTLE" } as const;
 
 /**
@@ -22,8 +21,23 @@ const KIND_LABEL = { scan: "SOLO SCAN", battle: "AURA BATTLE", squad: "SQUAD BAT
  * the "beat this score" CTA as a real button (joins the kiosk's challenger
  * queue), share with a ready caption, reactions, and "this was me".
  */
-export function ResultScreen({ detail }: { detail: FeedDetail }) {
+export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; timingMs?: number | null }) {
   const { entry, battle, scan, children } = detail;
+  /** This phone scanned (or claimed) it: challenge a friend instead of "scan yours". */
+  const [mine, setMine] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/cards/${entry.id}/mine`, { headers: { "X-Device-Id": clientId() }, cache: "no-store" })
+      .then((r) => r.json() as Promise<{ mine?: boolean }>)
+      .then((b) => {
+        if (!cancelled) setMine(Boolean(b.mine));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.id]);
   const [player, setPlayer] = useIdentity();
   const [busy, setBusy] = useState(false);
   const [queued, setQueued] = useState<number | null>(null);
@@ -31,8 +45,6 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const filename = `aura-${entry.kind}-${entry.id.slice(0, 8)}.png`;
-  // Browser-only capability: false on the server render, then the real answer (no hydration mismatch).
-  const canShare = useSyncExternalStore(noSubscribe, () => typeof navigator.share === "function", () => false);
 
   const beat = useCallback(
     async (name: string) => {
@@ -52,14 +64,15 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
     async (handle: string, slot: number | null) => {
       setBusy(true);
       try {
-        const res = await fetch(`/api/feed/${entry.id}/claim`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, slot }) });
+        const res = await fetch(`/api/feed/${entry.id}/claim`, { method: "POST", headers: { "Content-Type": "application/json", "X-Device-Id": clientId() }, body: JSON.stringify({ handle, slot }) });
         const body = (await res.json()) as { error?: string };
         setClaimMsg(res.ok ? "CLAIMED. IT COUNTS FOR YOUR STREAKS AND RIVALRIES NOW." : (body.error ?? "COULD NOT CLAIM."));
+        if (res.ok && !battle) setMine(true);
       } finally {
         setBusy(false);
       }
     },
-    [entry.id],
+    [entry.id, battle],
   );
 
   const download = useCallback(async () => {
@@ -76,27 +89,41 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
     }
   }, [entry.imageUrl, filename]);
 
+  const pageLink = useCallback(() => `${window.location.origin}/r/${entry.id}`, [entry.id]);
+
+  /** The native share sheet with the card image; else copy the link (the download button sits below). */
   const share = useCallback(async () => {
-    try {
-      const blob = await (await fetch(entry.imageUrl)).blob();
-      const file = new File([blob], filename, { type: "image/png" });
-      const data: ShareData = { title: "AURA OS", text: entry.caption ?? beatThisLine(entry.target), url: window.location.href };
-      if (navigator.canShare?.({ files: [file] })) data.files = [file];
-      await navigator.share(data);
-    } catch {
-      // cancelled or unsupported
+    setShareNote(null);
+    const text = entry.caption ?? beatThisLine(entry.target);
+    if (typeof navigator.share === "function") {
+      try {
+        const blob = await (await fetch(entry.imageUrl)).blob();
+        const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+        const data: ShareData = { title: "AURA OS", text, url: pageLink() };
+        if (navigator.canShare?.({ files: [file] })) data.files = [file];
+        await navigator.share(data);
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return; // they closed the sheet
+      }
     }
-  }, [entry.imageUrl, entry.caption, entry.target, filename]);
+    try {
+      await navigator.clipboard.writeText(`${text} ${pageLink()}`);
+      setShareNote("LINK COPIED. PASTE IT ANYWHERE, OR SAVE THE CARD BELOW.");
+    } catch {
+      setShareNote(pageLink());
+    }
+  }, [entry.imageUrl, entry.caption, entry.target, filename, pageLink]);
 
   const copyCaption = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(`${entry.caption ?? beatThisLine(entry.target)} ${window.location.href}`);
+      await navigator.clipboard.writeText(`${entry.caption ?? beatThisLine(entry.target)} ${pageLink()}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
     }
-  }, [entry.caption, entry.target]);
+  }, [entry.caption, entry.target, pageLink]);
 
   const squadLines = battle?.mode === "squad" && battle.commentary ? parseSquadCommentary(battle.commentary) : null;
   // Squad member cards already know their slot; battle cards ask which player you were.
@@ -113,6 +140,14 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
           <div className="os-window__body companion__card">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={entry.imageUrl} alt={`${KIND_LABEL[entry.kind]} card: ${entry.title}`} className="card-page__img" />
+            <div className="result-meta font-heading">
+              <span className={`source-chip source-chip--${entry.source}`}>{entry.source === "mobile" ? "PHONE SCAN" : "MIRROR SCAN"}</span>
+              {timingMs !== null && <span className="result-timing">PHOTO → CARD IN {(timingMs / 1000).toFixed(1)} S</span>}
+            </div>
+            <button type="button" className="companion__big-btn" onClick={() => void share()}>
+              [SHARE YOUR CARD]
+            </button>
+            {shareNote && <p className="companion__note result-share-note">{shareNote}</p>}
             <Reactions cardId={entry.id} initial={entry.reactions} />
           </div>
         </section>
@@ -125,6 +160,13 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
           <div className="os-window__body companion__cta">
             <DecodeNumber value={entry.target} className="companion__target font-number aura-text-glow" />
             <div className="font-heading text-xs uppercase">{beatThisLine(entry.target)}</div>
+            {mine ? (
+              <p className="companion__note">THIS ONE&apos;S YOURS. SEND IT TO A FRIEND AND SEE IF THEY CAN BEAT IT.</p>
+            ) : (
+              <Link href="/scan" className="companion__big-btn companion__link-btn">
+                [SCAN YOURS]
+              </Link>
+            )}
             {queued !== null ? (
               <p className="companion__note">
                 YOU&apos;RE #{queued} IN LINE. HEAD TO THE AURA OS MIRROR AND THROW TWO FISTS (OR DOUBLE PEACE) WHEN IT&apos;S FREE.
@@ -139,8 +181,8 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
                 }}
               />
             ) : (
-              <button type="button" className="companion__big-btn" disabled={busy} onClick={() => (player ? void beat(player.name) : setAskName("beat"))}>
-                [BEAT THIS SCORE]
+              <button type="button" className="card-page__button" disabled={busy} onClick={() => (player ? void beat(player.name) : setAskName("beat"))}>
+                [BEAT IT AT THE MIRROR: JOIN THE LINE]
               </button>
             )}
           </div>
@@ -193,6 +235,33 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
             <div className="os-window__body">
               <div className="font-heading uppercase">{scan.nickname}</div>
               <div className="companion__stats font-mono uppercase">{scan.styles}</div>
+              <dl className="result-stats font-mono">
+                <div>
+                  <dt>FIT VALUE</dt>
+                  <dd>${scan.stats.fitValue.toLocaleString("en-US")}</dd>
+                </div>
+                <div>
+                  <dt>UNIQUENESS</dt>
+                  <dd>{scan.stats.uniqueness}</dd>
+                </div>
+                <div>
+                  <dt>COHESION</dt>
+                  <dd>{scan.stats.cohesion}</dd>
+                </div>
+                <div>
+                  <dt>STATEMENT PIECES</dt>
+                  <dd>{scan.stats.statements}</dd>
+                </div>
+              </dl>
+              {scan.modifiers.length > 0 && (
+                <ul className="result-mods font-mono uppercase">
+                  {scan.modifiers.map((m) => (
+                    <li key={m.label}>
+                      <span aria-hidden>{m.emoji}</span> {m.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p className="companion__commentary">&gt; {scan.verdict}</p>
               {scan.handle && (
                 <a className="companion__handle" href={historyPath(scan.handle)}>
@@ -235,11 +304,6 @@ export function ResultScreen({ detail }: { detail: FeedDetail }) {
               <button type="button" className="card-page__button" onClick={download}>
                 [DOWNLOAD]
               </button>
-              {canShare && (
-                <button type="button" className="card-page__button" onClick={share}>
-                  [SHARE]
-                </button>
-              )}
             </div>
           </div>
         </section>

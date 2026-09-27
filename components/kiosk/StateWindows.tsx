@@ -136,13 +136,13 @@ export function NameEntryWindow({ suggestion, onSubmit, onCancel }: { suggestion
 /** After the name: the QR code to the saved share card. */
 export function ClaimWindow({ card, error, printing, badge = null }: { card: CardInfo | null; error: string | null; printing: boolean; badge?: BadgeStatus | null }) {
   return (
-    <OsWindow title="CLAIM_CARD.EXE" variant="light" className="w-[min(92vw,22rem)]">
+    <OsWindow title="CLAIM_CARD.EXE" variant="light" className="claim-window">
       <div className="flex flex-col items-center gap-3 text-center">
         {card ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={card.qrDataUrl} alt="QR code to your aura card" className="claim-qr" />
-            <div className="font-heading text-xs uppercase">SCAN TO GET YOUR CARD</div>
+            <div className="font-heading text-sm uppercase">SCAN TO TAKE YOUR CARD HOME</div>
             <div className="font-mono text-[9px] uppercase opacity-60 break-all">{card.pageUrl.replace(/^https?:\/\//, "")}</div>
           </>
         ) : error ? (
@@ -166,6 +166,23 @@ export function ClaimWindow({ card, error, printing, badge = null }: { card: Car
           </div>
         )}
         {badge?.status === "minted" && <div className="font-heading text-[10px] uppercase">✓ AURA BADGE MINTED ON SOLANA (DEVNET)</div>}
+      </div>
+    </OsWindow>
+  );
+}
+
+/**
+ * Idle screen: scan the QR to use AURA OS from your phone (/scan). Big, black
+ * on white: it sits behind the one-way acrylic and has to read from ~1.5 m.
+ */
+export function PhoneScanWindow({ qr, url }: { qr: string; url: string }) {
+  return (
+    <OsWindow title="SCAN_FROM_YOUR_PHONE.EXE" variant="light" className="phone-scan-window" still>
+      <div className="flex flex-col items-center gap-2 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={qr} alt="QR code: scan your fit from your phone" className="phone-scan-qr" />
+        <div className="font-heading text-sm uppercase">LINE TOO LONG? SCAN FROM YOUR PHONE</div>
+        <div className="font-mono text-[11px] uppercase opacity-70">{url.replace(/^https?:\/\//, "")}</div>
       </div>
     </OsWindow>
   );

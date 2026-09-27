@@ -22,6 +22,13 @@ export async function feedDetail(cardId: string): Promise<FeedDetail | null> {
           verdict: scan.analysis.verdict,
           styles: scan.analysis.style_mix.map((m) => `${m.style} ${Math.round(m.percent)}%`).join(", "),
           handle: leaderboard?.handle ?? null,
+          stats: {
+            fitValue: scan.breakdown.fitValue,
+            uniqueness: Math.round(scan.breakdown.avgUniqueness),
+            cohesion: scan.breakdown.cohesionScore,
+            statements: scan.breakdown.statementCount,
+          },
+          modifiers: scan.breakdown.modifiers.slice(0, 4).map((m) => ({ emoji: m.emoji, label: m.label, tier: m.tier })),
         }
       : null,
     children,

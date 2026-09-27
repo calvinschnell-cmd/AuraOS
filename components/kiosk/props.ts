@@ -60,6 +60,8 @@ export interface KioskViewProps {
   chooseMode: (choice: ModeChoice) => void;
   /** People who tapped "BEAT THIS SCORE" on a shared card, waiting for the mirror. */
   challengers: QueuedChallenger[];
+  /** Idle screen QR to /scan (phone scans), with its URL; null until drawn. */
+  phoneScan: { qr: string; url: string } | null;
   reboot: () => void;
   /** Session-end reboot: the boot sequence runs fast. */
   quickBoot: boolean;

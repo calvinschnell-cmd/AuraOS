@@ -44,7 +44,16 @@ export interface FeedDetail {
   entry: FeedEntry;
   battle: BattleRecord | null;
   /** Solo scan summary (no image). */
-  scan: { nickname: string; aura: number; verdict: string; styles: string; handle: string | null } | null;
+  scan: {
+    nickname: string;
+    aura: number;
+    verdict: string;
+    styles: string;
+    handle: string | null;
+    /** Key parts of the breakdown (flavor stats + the callouts that moved the score). */
+    stats: { fitValue: number; uniqueness: number; cohesion: number; statements: number };
+    modifiers: { emoji: string; label: string; tier: string }[];
+  } | null;
   /** Squad: each member's own card ("from Squad Battle"). */
   children: FeedEntry[];
 }

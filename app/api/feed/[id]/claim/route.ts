@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { deviceIdFrom } from "@/lib/server/rateLimit";
 import { getScanStore } from "@/lib/server/store";
 
 export const runtime = "nodejs";
@@ -33,6 +34,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ok = await store.setEntryHandle(entry.scanId, player.handle);
     }
     if (!ok) return NextResponse.json({ error: "ALREADY CLAIMED." }, { status: 409 });
+    // A solo card claimed from a phone is that phone's: it can start a challenge from it.
+    const device = deviceIdFrom(request.headers.get("x-device-id"));
+    if (device && !entry.battleId) await store.setCardDevice(entry.id, device).catch(() => false);
     return NextResponse.json({ ok: true, handle: player.handle });
   } catch (err) {
     console.error("[aura] claim failed", err);

@@ -1686,3 +1686,35 @@
     animation-timing-function: step-end;
   }
 }
+
+/* ---- phone companion QR codes (idle: /scan, claim: /r/[id]) */
+/* Black on white, big modules: they sit behind the one-way acrylic and must read from ~1.5 m. */
+.phone-scan-window,
+.claim-window {
+  width: min(92vw, 34rem);
+}
+.phone-scan-qr,
+.claim-qr {
+  display: block;
+  width: min(100%, 24vh);
+  height: auto;
+  aspect-ratio: 1;
+  background: #ffffff;
+  image-rendering: pixelated;
+}
+.claim-qr {
+  width: min(100%, 30vh);
+  border: 0;
+}
+.kiosk-main--mirror .phone-scan-window {
+  width: 100%;
+}
+.kiosk-main--mirror .phone-scan-qr {
+  width: min(100%, 22vh);
+}
+/* Mirror: the claim QR takes the whole panel width and sits over the capture photo. */
+.kiosk-main--mirror .claim-window {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+}

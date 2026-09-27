@@ -27,6 +27,7 @@ import {
   NameEntryWindow,
   RoastWindow,
   SoloBattleWindow,
+  PhoneScanWindow,
   SystemErrorWindow,
   TideChartWindow,
 } from "./StateWindows";
@@ -151,6 +152,7 @@ export function MirrorLayout(p: KioskViewProps) {
               {showingBattle && <CommentaryWindow battle={battle} reveal={session.reveal} done={session.commentaryDone} />}
               {inLobby && <LobbyWindow lobby={lobby} state={state} onStart={() => p.send({ type: "START_BATTLE" })} />}
               {showsModeSelect(state) && <ModeSelectWindow onChoose={p.chooseMode} challengers={p.challengers} />}
+              {idle && p.phoneScan && <PhoneScanWindow qr={p.phoneScan.qr} url={p.phoneScan.url} />}
               {state === "ANALYZING" && (
                 <OsWindow title="ANALYZER.EXE" className="w-[min(80vw,20rem)]">
                   <div className="analyzing font-heading text-xs uppercase">
