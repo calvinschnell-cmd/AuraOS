@@ -83,7 +83,7 @@ export interface ViewerBest {
 }
 
 /** Feed row for a card (reactions filled in by the store). */
-export function feedEntryOf(card: StoredCard, reactions: Record<string, number>): FeedEntry {
+export function feedEntryOf(card: StoredCard, reactions: Record<string, number>, handle: string | null = null): FeedEntry {
   return {
     id: card.id,
     kind: card.kind,
@@ -98,6 +98,7 @@ export function feedEntryOf(card: StoredCard, reactions: Record<string, number>)
     battleId: card.battleId,
     slot: card.slot,
     source: card.source,
+    handle,
     reactions,
   };
 }
@@ -423,6 +424,10 @@ export class MemoryStore implements ScanStore {
       .map((b) => structuredClone(b));
   }
 
+  private handleOf(card: StoredCard): string | null {
+    if (!card.scanId || card.battleId) return null;
+    return this.s.entries.find((e) => e.scanId === card.scanId)?.handle ?? null;
+  }
   private counts(cardId: string): Record<string, number> {
     const out = emptyReactions();
     for (const [emoji, clients] of this.s.reactions.get(cardId) ?? []) out[emoji] = clients.size;
@@ -433,7 +438,7 @@ export class MemoryStore implements ScanStore {
       .filter((c) => c.parentId === null && !c.hidden && (!before || c.createdAt < before) && (!since || c.createdAt > since))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit)
-      .map((c) => feedEntryOf(c, this.counts(c.id)));
+      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c)));
   }
   async cardsForHandle(handle: string, limit: number) {
     const h = handle.toUpperCase();
@@ -450,17 +455,17 @@ export class MemoryStore implements ScanStore {
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit)
-      .map((c) => feedEntryOf(c, this.counts(c.id)));
+      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c)));
   }
   async feedEntry(cardId: string) {
     const c = this.s.cards.find((x) => x.id === cardId && !x.hidden);
-    return c ? feedEntryOf(c, this.counts(c.id)) : null;
+    return c ? feedEntryOf(c, this.counts(c.id), this.handleOf(c)) : null;
   }
   async childCards(parentId: string) {
     return this.s.cards
       .filter((c) => c.parentId === parentId && !c.hidden)
       .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
-      .map((c) => feedEntryOf(c, this.counts(c.id)));
+      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c)));
   }
   async react(cardId: string, emoji: string, clientId: string) {
     let byEmoji = this.s.reactions.get(cardId);

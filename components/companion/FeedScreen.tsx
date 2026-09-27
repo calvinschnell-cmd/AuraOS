@@ -1,55 +1,57 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { FEED_WINDOW_MS, type FeedEntry } from "@/lib/feed/types";
-import type { LeaderboardSnapshot } from "@/lib/kiosk/types";
-import { handleName, rivalryLine } from "@/lib/leaderboard/narrative";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FeedEntry } from "@/lib/feed/types";
 import { formatAura } from "@/lib/scoring";
 import { AppShell } from "./AppShell";
 import { DecodeNumber } from "./DecodeNumber";
 import { IdentityBar } from "./Identity";
 import { Reactions } from "./Reactions";
+import { stagger } from "./Standings";
 
-const KIND_CHIP = { scan: "SOLO", battle: "1V1", squad: "SQUAD" } as const;
-const HEADLINE_LABEL = { scan: "AURA", battle: "WON BY", squad: "GROUP AURA" } as const;
-/** New cards and standings show up without a refresh. */
+const KIND_CHIP: Record<string, string> = { scan: "SOLO", battle: "1V1", squad: "SQUAD", challenge: "CHALLENGE" };
+const HEADLINE_LABEL: Record<string, string> = { scan: "AURA", battle: "WON BY", squad: "GROUP AURA", challenge: "WON BY" };
+/** New cards (and removals) show up without a refresh. */
 const FEED_POLL_MS = 8_000;
-const STANDINGS_POLL_MS = 10_000;
-/** Stagger for rows sliding in (capped so long lists do not wait). */
-const stagger = (i: number): CSSProperties => ({ "--i": Math.min(i, 8) }) as CSSProperties;
-
-export type FeedTab = "feed" | "standings";
 
 const ago = (iso: string) => {
   const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
   if (s < 60) return `${s}S AGO`;
   if (s < 3600) return `${Math.round(s / 60)}M AGO`;
-  return `${Math.round(s / 3600)}H AGO`;
+  if (s < 86_400) return `${Math.round(s / 3600)}H AGO`;
+  return `${Math.round(s / 86_400)}D AGO`;
 };
 
-/** The newest card, big: the thing everyone at the mirror just watched. */
+/** Where to open an entry: its card page, or its challenge page. */
+export const entryHref = (e: FeedEntry) => (e.challengeId ? `/c/${e.challengeId}` : `/r/${e.id}`);
+
+function Source({ entry }: { entry: FeedEntry }) {
+  return <span className={`feed__chip feed__chip--src ${entry.source === "mobile" ? "feed__chip--phone" : ""}`}>{entry.source === "mobile" ? "📱 PHONE" : "🪞 MIRROR"}</span>;
+}
+
+/** The newest card, big: the thing everyone just watched. */
 function JustScanned({ entry, fresh }: { entry: FeedEntry; fresh: boolean }) {
   return (
     <section className={`feed-hero ${fresh ? "feed-hero--fresh" : ""}`} aria-label="Most recent scan">
       <div className="feed-hero__label font-heading">
         <span className="feed-hero__live" aria-hidden />
-        JUST SCANNED · {ago(entry.createdAt)}
+        JUST IN · {ago(entry.createdAt)}
       </div>
-      <Link href={`/r/${entry.id}`} className="feed-hero__card">
+      <Link href={entryHref(entry)} className="feed-hero__card">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={entry.imageUrl} alt={entry.title} className="feed-hero__img" />
       </Link>
       <div className="feed-hero__row">
         <div className="min-w-0">
           <div className="feed__title font-heading">
-            <span className="feed__chip">{KIND_CHIP[entry.kind]}</span> {entry.title}
+            <span className="feed__chip">{KIND_CHIP[entry.kind] ?? "CARD"}</span> <Source entry={entry} /> {entry.title}
           </div>
+          {entry.handle && <div className="feed__handle font-mono">{entry.handle}</div>}
           {entry.verdict && <div className="feed-hero__verdict">{entry.verdict}</div>}
         </div>
         <div className="feed-hero__score">
-          <span className="font-heading">{HEADLINE_LABEL[entry.kind]}</span>
+          <span className="font-heading">{HEADLINE_LABEL[entry.kind] ?? "AURA"}</span>
           <DecodeNumber value={entry.headline} className="font-number" />
         </div>
       </div>
@@ -63,17 +65,19 @@ function FeedList({ entries }: { entries: FeedEntry[] }) {
     <ol className="feed">
       {entries.map((e, i) => (
         <li key={e.id} className="rise" style={stagger(i)}>
-          <Link href={`/r/${e.id}`} className="feed__row">
+          <Link href={entryHref(e)} className="feed__row">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={e.imageUrl} alt="" className="feed__thumb" loading="lazy" />
             <div className="feed__body">
               <div className="feed__meta font-heading">
-                <span className="feed__chip">{KIND_CHIP[e.kind]}</span>
+                <span className="feed__chip">{KIND_CHIP[e.kind] ?? "CARD"}</span>
+                <Source entry={e} />
                 <span>{ago(e.createdAt)}</span>
               </div>
               <div className="feed__title font-heading">{e.title}</div>
+              {e.handle && <div className="feed__handle font-mono">{e.handle}</div>}
               <div className="feed__score">
-                <span className="font-heading">{HEADLINE_LABEL[e.kind]}</span> <span className="font-number">{formatAura(e.headline)}</span>
+                <span className="font-heading">{HEADLINE_LABEL[e.kind] ?? "AURA"}</span> <span className="font-number">{formatAura(e.headline)}</span>
               </div>
               {e.verdict && <div className="feed__verdict">{e.verdict}</div>}
               <Reactions cardId={e.id} initial={e.reactions} compact />
@@ -85,84 +89,21 @@ function FeedList({ entries }: { entries: FeedEntry[] }) {
   );
 }
 
-/** Live leaderboard: tap a row to open that player's card. */
-function Standings({ snapshot, squadCardId }: { snapshot: LeaderboardSnapshot | null; squadCardId: string | null }) {
-  if (!snapshot)
-    return (
-      <ol className="standings__list" aria-label="Loading the standings">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <li key={i} className="standings__row skeleton" style={stagger(i)}>
-            <span className="skeleton__block skeleton__block--rank" />
-            <span className="skeleton__block" />
-            <span className="skeleton__block skeleton__block--score" />
-          </li>
-        ))}
-      </ol>
-    );
-  const { top, narrative } = snapshot;
-  if (top.length === 0) return <p className="companion__note">NOBODY ON THE BOARD YET. SCAN AT THE MIRROR AND GIVE IT A THUMBS UP.</p>;
-  const champ = narrative?.squadChampion ?? null;
-  return (
-    <div className="standings">
-      {champ && (
-        <Link href={squadCardId ? `/r/${squadCardId}` : "#"} className={`standings__special ${squadCardId ? "" : "standings__special--static"}`}>
-          <span className="font-heading">👑 SQUAD CHAMPION</span>
-          <span className="standings__special-body">
-            {champ.vibe.toUpperCase()} · {champ.players} PLAYERS · <span className="font-number">{formatAura(champ.score)}</span>
-          </span>
-        </Link>
-      )}
-      {narrative?.rivalry && (
-        <div className="standings__special standings__special--static">
-          <span className="font-heading">⚔️ RIVALRY OF THE DAY</span>
-          <span className="standings__special-body">{rivalryLine(narrative.rivalry)}</span>
-        </div>
-      )}
-      <ol className="standings__list">
-        {top.slice(0, 10).map((e, i) => {
-          const streak = e.handle ? narrative?.streaks[e.handle] : undefined;
-          const up = e.handle ? narrative?.improved[e.handle] : undefined;
-          const href = e.cardId ? `/r/${e.cardId}` : e.handle ? `/u/${encodeURIComponent(e.handle)}` : null;
-          const body = (
-            <>
-              <span className={`standings__rank font-number ${i < 3 ? "standings__rank--podium" : ""}`}>{i + 1}</span>
-              <span className="standings__who">
-                <span className="standings__nick font-heading">{e.nickname}</span>
-                <span className="standings__sub font-mono">
-                  {e.handle ? handleName(e.handle) : e.standout ? e.standout : " "}
-                  {streak ? ` · 🔥${streak}` : ""}
-                  {up ? ` · ↑${formatAura(up)}` : ""}
-                </span>
-              </span>
-              <span className={`standings__aura font-number ${e.aura < 0 ? "standings__aura--neg" : ""}`}>{formatAura(e.aura, true)}</span>
-              {href && <span className="standings__go" aria-hidden>›</span>}
-            </>
-          );
-          return <li key={e.id} className="rise" style={stagger(i)}>{href ? <Link href={href} className="standings__row">{body}</Link> : <div className="standings__row">{body}</div>}</li>;
-        })}
-      </ol>
-    </div>
-  );
-}
-
 /**
- * The phone side of the mirror: the card that was just scanned (react to it
- * live), then every card (FEED) or the live leaderboard (STANDINGS), where a
- * tap opens that player's card. New cards appear on their own; scrolled down,
- * a pill says so. The tab lives in the URL, so the tab bar's BOARD works too.
+ * /feed: every result from the mirror and from phones, newest first (face
+ * blurred cards only, never photos). New cards and admin removals apply on
+ * their own; scrolling to the bottom loads older cards. Read-only apart from
+ * the existing reactions.
  */
-export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { initial: FeedEntry[]; initialNext: string | null; initialTab?: FeedTab }) {
-  const router = useRouter();
-  const params = useSearchParams();
-  const tab: FeedTab = params ? (params.get("tab") === "standings" ? "standings" : "feed") : initialTab;
+export function FeedScreen({ initial, initialNext }: { initial: FeedEntry[]; initialNext: string | null }) {
   const [entries, setEntries] = useState(initial);
   const [next, setNext] = useState(initialNext);
   const [loading, setLoading] = useState(false);
-  const [standings, setStandings] = useState<LeaderboardSnapshot | null>(null);
   const [freshId, setFreshId] = useState<string | null>(null);
   const [unseen, setUnseen] = useState(0);
+  const sentinel = useRef<HTMLDivElement | null>(null);
 
-  // New cards: merge the newest page in on top (keeps what was already loaded below).
+  // New cards: merge the newest page in on top (keeps what was already loaded below); drop removed ones.
   const entriesRef = useRef(entries);
   useEffect(() => {
     entriesRef.current = entries;
@@ -171,9 +112,11 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
     const id = window.setInterval(async () => {
       try {
         const res = await fetch("/api/feed", { cache: "no-store" });
-        const body = (await res.json()) as { entries?: FeedEntry[] };
+        const body = (await res.json()) as { entries?: FeedEntry[]; removed?: string[] };
+        const removed = new Set(body.removed ?? []);
         const known = new Set(entriesRef.current.map((e) => e.id));
-        const added = (body.entries ?? []).filter((e) => !known.has(e.id));
+        const added = (body.entries ?? []).filter((e) => !known.has(e.id) && !removed.has(e.id));
+        if (removed.size > 0 && entriesRef.current.some((e) => removed.has(e.id))) setEntries((old) => old.filter((e) => !removed.has(e.id)));
         if (added.length === 0) return;
         setFreshId(added[0].id);
         setEntries((old) => [...added.filter((a) => !old.some((o) => o.id === a.id)), ...old]);
@@ -195,60 +138,41 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
     return () => window.removeEventListener("scroll", onScroll);
   }, [unseen]);
 
-  useEffect(() => {
-    if (tab !== "standings") return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/leaderboard", { cache: "no-store" });
-        if (!res.ok) return;
-        const body = (await res.json()) as LeaderboardSnapshot;
-        if (!cancelled) setStandings(body);
-      } catch {
-        // keep the last standings
-      }
-    };
-    void load();
-    const id = window.setInterval(load, STANDINGS_POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [tab]);
-
-  const chooseTab = (t: FeedTab) => router.replace(t === "feed" ? "/feed" : "/feed?tab=standings", { scroll: false });
-
   const more = useCallback(async () => {
-    if (!next) return;
+    if (!next || loading) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/feed?before=${encodeURIComponent(next)}`);
       const body = (await res.json()) as { entries: FeedEntry[]; next: string | null };
       setEntries((e) => [...e, ...body.entries.filter((n) => !e.some((o) => o.id === n.id))]);
       setNext(body.next);
+    } catch {
+      // try again on the next scroll / tap
     } finally {
       setLoading(false);
     }
-  }, [next]);
+  }, [next, loading]);
 
-  // The feed is the last half hour: cards age out on an open page too.
-  const [clock, setClock] = useState(() => Date.now());
+  // Infinite scroll: load older cards as the bottom comes into view.
   useEffect(() => {
-    const id = window.setInterval(() => setClock(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
-  const live = entries.filter((e) => clock - Date.parse(e.createdAt) < FEED_WINDOW_MS);
-  const [hero, ...rest] = live;
-  const champ = standings?.narrative?.squadChampion ?? null;
-  const squadCardId = champ ? (live.find((e) => e.battleId === champ.battleId && e.kind === "squad")?.id ?? null) : null;
+    const el = sentinel.current;
+    if (!el || !next || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((items) => {
+      if (items.some((i) => i.isIntersecting)) void more();
+    }, { rootMargin: "400px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [next, more]);
+
+  const [hero, ...rest] = entries;
 
   return (
     <AppShell
-      title={tab === "feed" ? "LIVE" : "STANDINGS"}
-      tab={tab === "feed" ? "feed" : "board"}
+      title="FEED"
+      tab="feed"
       action={
-        <Link href="/leaderboard" className="font-heading">
-          BIG SCREEN ↗
+        <Link href="/scan" className="font-heading">
+          SCAN ↗
         </Link>
       }
     >
@@ -259,40 +183,30 @@ export function FeedScreen({ initial, initialNext, initialTab = "feed" }: { init
       )}
       <div className="wordmark">
         <h1 className="wordmark__title font-heading uppercase">AURA BATTLES</h1>
-        <p className="wordmark__sub wordmark__sub--caret font-mono uppercase">LIVE FROM THE MIRROR · HACKGT 13</p>
+        <p className="wordmark__sub wordmark__sub--caret font-mono uppercase">LIVE FROM THE MIRROR + PHONES · HACKGT 13</p>
       </div>
       <IdentityBar />
-      {tab === "standings" ? null : hero ? (
+      {hero ? (
         <JustScanned key={hero.id} entry={hero} fresh={hero.id === freshId} />
       ) : (
         <div className="empty-state">
           <span className="empty-state__glyph font-number" aria-hidden>
             [ _ ]
           </span>
-          <p className="companion__note">NOTHING IN THE LAST 30 MINUTES. SCAN AT THE MIRROR AND GIVE IT A THUMBS UP.</p>
+          <p className="companion__note">NO CARDS YET. SCAN AT THE MIRROR, OR FROM YOUR PHONE.</p>
+          <Link href="/scan" className="companion__big-btn companion__link-btn">
+            [SCAN YOUR FIT]
+          </Link>
         </div>
       )}
-      <div className="feed-tabs" role="tablist">
-        <span className="feed-tabs__slider" style={{ transform: `translateX(${tab === "feed" ? 0 : 100}%)` }} aria-hidden />
-        {(["feed", "standings"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={`feed-tabs__tab font-heading ${tab === t ? "feed-tabs__tab--on" : ""}`} onClick={() => chooseTab(t)}>
-            {t === "feed" ? "FEED" : "STANDINGS"}
-          </button>
-        ))}
-      </div>
-      {tab === "feed" ? (
-        <>
-          <p className="companion__note">THE LAST 30 MINUTES AT THE MIRROR. TAP A CARD AND HIT “THIS WAS ME” TO KEEP IT ON YOUR PROFILE.</p>
-          <FeedList entries={rest} />
-          {next && (
-            <button type="button" className="card-page__button" onClick={more} disabled={loading}>
-              [{loading ? "LOADING..." : "LOAD MORE"}]
-            </button>
-          )}
-        </>
-      ) : (
-        <Standings snapshot={standings} squadCardId={squadCardId} />
+      <FeedList entries={rest} />
+      <div ref={sentinel} aria-hidden />
+      {next && (
+        <button type="button" className="card-page__button" onClick={() => void more()} disabled={loading}>
+          [{loading ? "LOADING..." : "LOAD MORE"}]
+        </button>
       )}
+      {!next && entries.length > 0 && <p className="companion__note feed__end">THAT&apos;S EVERY CARD SO FAR.</p>}
     </AppShell>
   );
 }

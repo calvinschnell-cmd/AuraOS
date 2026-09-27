@@ -409,6 +409,14 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
   const queue = usePoll<{ challenges: QueuedChallenger[]; called: CalledChallenger | null }>("/api/challenges", POLL.queue);
   const stats = usePoll<UsageStats>("/api/stats", POLL.stats);
   const feed = usePoll<{ entries: FeedEntry[] }>("/api/feed", POLL.feed);
+  // Cards hidden from here disappear right away; the next feed poll confirms it.
+  const [hiddenCards, setHiddenCards] = useState<ReadonlySet<string>>(() => new Set());
+  const hideCard = async (c: FeedEntry) => {
+    if (!window.confirm(`Remove "${c.title}" from the feed, the board and its page?`)) return;
+    const res = await fetch("/api/admin/remove", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-key": key }, body: JSON.stringify({ cardId: c.id }) });
+    if (res.ok) setHiddenCards((h) => new Set(h).add(c.id));
+    else window.alert(`Remove failed (${res.status}).`);
+  };
   const { snapshot } = useLeaderboard(5_000);
 
   useEffect(() => {
@@ -526,8 +534,9 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
           </Win>
           <Win title={`FEED.EXE · ${feed.data?.entries.length ?? 0} CARDS`}>
             <div className="op-cards op-cards--feed">
-              {(feed.data?.entries ?? []).map((c) => (
-                <a key={c.id} href={`/r/${c.id}`} target="_blank" rel="noreferrer" className="op-card">
+              {(feed.data?.entries ?? []).filter((c) => !hiddenCards.has(c.id)).map((c) => (
+                <div key={c.id} className="op-card-wrap">
+                <a href={`/r/${c.id}`} target="_blank" rel="noreferrer" className="op-card">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={c.imageUrl} alt="" loading="lazy" />
                   <span className="op-card__title">{c.title}</span>
@@ -539,6 +548,10 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
                       .join(" ") || "NO REACTIONS"}
                   </span>
                 </a>
+                <button type="button" className="op-btn op-card__hide" onClick={() => void hideCard(c)} aria-label={`Remove ${c.title}`}>
+                  HIDE
+                </button>
+                </div>
               ))}
               {feed.data && feed.data.entries.length === 0 && <div className="op-note">NO CARDS YET.</div>}
             </div>

@@ -1091,3 +1091,26 @@ a.standings__row:active {
   background: var(--aura-cyan);
   color: var(--aura-ink);
 }
+
+/* /feed: source + handle */
+.feed__chip--src {
+  background: transparent;
+  color: var(--aura-cyan);
+  border: 1px solid color-mix(in srgb, var(--aura-cyan) 55%, transparent);
+}
+.feed__chip--phone {
+  border-color: var(--aura-glow);
+}
+.feed__handle {
+  font-size: 0.6rem;
+  opacity: 0.75;
+}
+.feed__end {
+  text-align: center;
+  opacity: 0.6;
+}
+.result-removed {
+  padding: 1rem;
+  border: 1px solid var(--aura-glow);
+  text-align: center;
+}

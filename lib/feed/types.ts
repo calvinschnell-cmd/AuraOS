@@ -36,6 +36,10 @@ export interface FeedEntry {
   slot: number | null;
   /** Mirror or phone. */
   source: ScanSource;
+  /** The player's AURA ID when a solo card is tied to one. */
+  handle: string | null;
+  /** Challenge battles (/c/[id]): the feed opens the challenge page instead of the card. */
+  challengeId?: string | null;
   reactions: Record<string, number>;
 }
 
@@ -56,15 +60,4 @@ export interface FeedDetail {
   } | null;
   /** Squad: each member's own card ("from Squad Battle"). */
   children: FeedEntry[];
-}
-
-/**
- * The public feed only shows the last half hour of the mirror. Nothing is
- * deleted: card links and QR codes keep working, and cards claimed with an
- * AURA ID stay on that player's profile (/u/[handle]).
- */
-export const FEED_WINDOW_MS = 30 * 60 * 1000;
-
-export function feedSince(now = Date.now()): string {
-  return new Date(now - FEED_WINDOW_MS).toISOString();
 }

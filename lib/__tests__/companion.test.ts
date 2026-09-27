@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "@/lib/fixtures";
 import { MemoryStore, type StoredScan } from "@/lib/server/store";
 import { scoreScan, gptJudge } from "@/lib/scoring";
@@ -58,5 +58,29 @@ describe("admin removal", () => {
     expect(await store.viewerBest("phone-xyz-789", null)).toBeNull();
     expect(await store.hiddenCardIds(before)).toEqual([gone.cardId]);
     expect(await store.hideCard("00000000-0000-4000-9000-999999999999")).toBe(false);
+  });
+});
+
+describe("POST /api/admin/remove", () => {
+  it("needs the ADMIN_KEY, then hides the card everywhere", async () => {
+    vi.stubEnv("ADMIN_KEY", "test-admin-key");
+    vi.stubEnv("TIGER_DATABASE_URL", "");
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { getScanStore } = await import("@/lib/server/store");
+    const store = getScanStore() as MemoryStore;
+    const { cardId } = await addEntry(store, 42_000);
+    const { POST } = await import("@/app/api/admin/remove/route");
+    const call = (headers: Record<string, string>, body: unknown = { cardId }) =>
+      POST(new Request("http://localhost/api/admin/remove", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }));
+    expect((await call({})).status).toBe(401);
+    expect((await call({ "x-admin-key": "wrong" })).status).toBe(401);
+    expect((await call({ authorization: "Bearer test-admin-key" }, { cardId: "00000000-0000-4000-9000-999999999999" })).status).toBe(404);
+    expect((await call({ "x-admin-key": "test-admin-key" })).status).toBe(200);
+    expect(await store.feedEntry(cardId)).toBeNull();
+    const { GET } = await import("@/app/api/feed/route");
+    const feed = (await (await GET(new Request("http://localhost/api/feed"))).json()) as { entries: { id: string }[]; removed: string[] };
+    expect(feed.entries.map((e) => e.id)).not.toContain(cardId);
+    expect(feed.removed).toContain(cardId);
+    vi.unstubAllEnvs();
   });
 });

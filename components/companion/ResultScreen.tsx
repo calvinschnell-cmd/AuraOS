@@ -44,7 +44,22 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
   const [askName, setAskName] = useState<"beat" | "claim" | null>(null);
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const filename = `aura-${entry.kind}-${entry.id.slice(0, 8)}.png`;
+  /** Mirror cards are PNG, phone cards JPEG: the extension follows the bytes. */
+  const fileName = useCallback((blob: Blob) => `aura-${entry.kind}-${entry.id.slice(0, 8)}.${blob.type.includes("jpeg") ? "jpg" : "png"}`, [entry.kind, entry.id]);
+
+  // Removed by an admin while open: the page says so on its next check.
+  const [removed, setRemoved] = useState(false);
+  useEffect(() => {
+    const id = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/feed/${entry.id}`, { cache: "no-store" });
+        if (res.status === 404) setRemoved(true);
+      } catch {
+        // offline: keep showing it
+      }
+    }, 15_000);
+    return () => window.clearInterval(id);
+  }, [entry.id]);
 
   const beat = useCallback(
     async (name: string) => {
@@ -81,13 +96,13 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = fileName(blob);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch {
       window.open(entry.imageUrl, "_blank");
     }
-  }, [entry.imageUrl, filename]);
+  }, [entry.imageUrl, fileName]);
 
   const pageLink = useCallback(() => `${window.location.origin}/r/${entry.id}`, [entry.id]);
 
@@ -98,7 +113,7 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
     if (typeof navigator.share === "function") {
       try {
         const blob = await (await fetch(entry.imageUrl)).blob();
-        const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+        const file = new File([blob], fileName(blob), { type: blob.type || "image/jpeg" });
         const data: ShareData = { title: "AURA OS", text, url: pageLink() };
         if (navigator.canShare?.({ files: [file] })) data.files = [file];
         await navigator.share(data);
@@ -113,7 +128,7 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
     } catch {
       setShareNote(pageLink());
     }
-  }, [entry.imageUrl, entry.caption, entry.target, filename, pageLink]);
+  }, [entry.imageUrl, entry.caption, entry.target, fileName, pageLink]);
 
   const copyCaption = useCallback(async () => {
     try {
@@ -129,6 +144,19 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
   // Squad member cards already know their slot; battle cards ask which player you were.
   const claimSlots = battle ? (entry.slot !== null ? [entry.slot] : battle.players.filter((p) => !p.handle).map((p) => p.slot)) : [];
   const canClaim = battle ? claimSlots.length > 0 : scan !== null && !scan.handle;
+
+  if (removed) {
+    return (
+      <AppShell title="REMOVED" tab="feed">
+        <div className="result-removed">
+          <p className="companion__note">THIS CARD WAS TAKEN DOWN.</p>
+          <Link href="/feed" className="card-page__button">
+            [BACK TO THE FEED]
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={KIND_LABEL[entry.kind]} tab="feed">

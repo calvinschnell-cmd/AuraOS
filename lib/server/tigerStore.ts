@@ -417,8 +417,14 @@ export class TigerStore implements ScanStore {
     return out;
   }
   private async toFeed(rows: CardRow[]): Promise<FeedEntry[]> {
-    const counts = await this.reactionCounts(rows.map((r) => r.id));
-    return rows.map((r) => feedEntryOf(toCard(r), counts.get(r.id) ?? emptyReactions()));
+    const solo = rows.filter((r) => r.scan_id && !r.battle_id).map((r) => r.scan_id!);
+    const [counts, handles] = await Promise.all([
+      this.reactionCounts(rows.map((r) => r.id)),
+      solo.length
+        ? (await this.db()).query<{ scan_id: string; handle: string | null }>(`SELECT scan_id, handle FROM leaderboard_entries WHERE scan_id = ANY($1::uuid[])`, [solo]).then((q) => new Map(q.rows.map((h) => [h.scan_id, h.handle])))
+        : Promise.resolve(new Map<string, string | null>()),
+    ]);
+    return rows.map((r) => feedEntryOf(toCard(r), counts.get(r.id) ?? emptyReactions(), (r.scan_id && !r.battle_id ? handles.get(r.scan_id) : null) ?? null));
   }
   async feed(limit: number, before?: string | null, since?: string | null) {
     const { rows } = await (await this.db()).query<CardRow>(
