@@ -81,6 +81,12 @@ export class Announcer {
   /** The item being spoken right now (an interlude waits for it to finish). */
   private current: Promise<void> | null = null;
   private busyListeners = new Set<(busy: boolean) => void>();
+  /**
+   * Bumped by stop(): a drain loop or item from before the stop sees the
+   * change and quits, so a stopped line never finishes (no later sentences,
+   * no clip that was still downloading) and two loops never talk at once.
+   */
+  private generation = 0;
   private audio: HTMLAudioElement | null = null;
   private voice: SpeechSynthesisVoice | null = null;
   /** Browser voice settings (/admin SOUND): a voice by name (null = the announcer default), speed and pitch. */
@@ -184,6 +190,7 @@ export class Announcer {
   }
 
   stop(): void {
+    this.generation++;
     // Anything synced to queued lines still happens (all at once), so nothing is left half revealed.
     const pending = this.queue;
     this.queue = [];
@@ -204,22 +211,27 @@ export class Announcer {
   }
 
   private async drain(): Promise<void> {
+    const gen = this.generation;
     this.setSpeaking(true);
-    while (this.queue.length > 0) {
-      while (Date.now() < this.holdUntil) await sleep(Math.min(100, this.holdUntil - Date.now()));
+    while (this.queue.length > 0 && gen === this.generation) {
+      while (Date.now() < this.holdUntil && gen === this.generation) await sleep(Math.min(100, this.holdUntil - Date.now()));
+      if (gen !== this.generation) return; // stop() during the hold: a newer loop owns the queue
       const item = this.queue.shift();
-      if (!item) break; // stop() emptied the queue during the hold
+      if (!item) break;
       this.prefetch();
       if (item.pauseMs) await sleep(item.pauseMs);
-      this.current = this.speak(item);
+      if (gen !== this.generation) return;
+      this.current = this.speak(item, gen);
       await this.current;
       this.current = null;
     }
-    this.setSpeaking(false);
+    // stop() already reported idle, and a newer loop may be speaking: only the live loop reports.
+    if (gen === this.generation) this.setSpeaking(false);
   }
 
   /** One queue item: its hooks around the clip, the browser voice, or (muted / voiceless) an estimated silence. */
-  private async speak(item: QueueItem): Promise<void> {
+  private async speak(item: QueueItem, gen: number): Promise<void> {
+    const stopped = () => gen !== this.generation;
     if (item.run) {
       const ms = item.run();
       if (ms) await sleep(ms);
@@ -228,35 +240,36 @@ export class Announcer {
     const hooked = Boolean(item.onStart || item.onEnd);
     const silent = async () => {
       item.onStart?.();
-      if (hooked) await sleep(estimateMs(item.lines));
+      if (hooked && !stopped()) await sleep(estimateMs(item.lines));
       item.onEnd?.();
     };
     if (this.muted || item.lines.length === 0) return silent();
     if (item.premium) {
       const clip = await (item.clip ?? (premiumVoiceOff ? Promise.resolve(null) : fetchVoiceClip(item.lines.join(" "))));
-      if (this.muted) return silent();
+      // Stopped while the clip was downloading: never play it.
+      if (this.muted || stopped()) return silent();
       if (clip) {
         item.onStart?.();
         const played = await this.play(clip);
-        if (played) {
+        if (played || stopped()) {
           item.onEnd?.();
           return;
         }
         if (!this.available) return void item.onEnd?.();
-        await this.utterAll(item);
+        await this.utterAll(item, gen);
         item.onEnd?.();
         return;
       }
     }
     if (!this.available) return silent();
     item.onStart?.();
-    await this.utterAll(item);
+    await this.utterAll(item, gen);
     item.onEnd?.();
   }
 
-  private async utterAll(item: QueueItem): Promise<void> {
+  private async utterAll(item: QueueItem, gen: number): Promise<void> {
     for (let i = 0; i < item.lines.length; i++) {
-      if (this.muted) break;
+      if (this.muted || gen !== this.generation) break;
       await this.utter(item.lines[i]);
       if (i < item.lines.length - 1) await sleep(item.gapMs);
     }

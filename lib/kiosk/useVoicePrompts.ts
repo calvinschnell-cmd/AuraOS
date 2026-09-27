@@ -57,6 +57,9 @@ export function useVoicePrompts(opts: {
     const from = prev.current;
     prev.current = state;
     if (from === state) return;
+    // The session ended (reset, [REBOOT], open palm, timeout): whatever it was saying stops now.
+    const ended = (state === "BOOT" && from !== "BOOT") || (isIdleState(state) && !isIdleState(from) && from !== "BOOT");
+    if (ended) announcer.stop();
     const say = (key: VoicePrompt) => announcer.sayPremium([pick(key)]);
     if (from === "ATTRACT" && state === "SPINNING") say("personSeen");
     if (state === "GREETING" && session.greetingIndex !== null) announcer.sayPremium([GREETINGS[session.greetingIndex]]);
