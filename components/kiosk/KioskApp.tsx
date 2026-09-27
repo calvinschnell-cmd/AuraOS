@@ -13,7 +13,7 @@ import { captureLobby, createBattle, scoreCapture, streamCommentary, warmUp } fr
 import { isIdleState } from "@/lib/kiosk/machine";
 import { makeKioskQrDataUrl } from "@/lib/kiosk/qr";
 import type { PoseSnapshot } from "@/lib/pose/landmarks";
-import { MeltdownTracker } from "@/lib/kiosk/meltdown";
+import { DEFAULT_MELTDOWN, MeltdownTracker } from "@/lib/kiosk/meltdown";
 import { useKioskMusic } from "@/lib/kiosk/music";
 import { REACTIONS, reactionFor } from "@/lib/kiosk/reactionTiers";
 import { useReactions } from "@/lib/kiosk/reactions";
@@ -139,8 +139,10 @@ export default function KioskApp({
   const onBootDone = useCallback(() => send({ type: "BOOT_DONE" }), [send]);
 
   // ---- wave meltdown: every WAVE is counted (since the last scan) and each
-  // "hi" back is less enthusiastic; scanning or going idle resets it.
-  const meltdown = useMemo(() => new MeltdownTracker(), []);
+  // "hi" back is less enthusiastic; scanning or going idle resets it. The
+  // mannequin always waves back (more bored each time), so it never crosses
+  // its arms or sulks.
+  const meltdown = useMemo(() => new MeltdownTracker({ ...DEFAULT_MELTDOWN, annoyedAt: Infinity, sulkAt: Infinity }), []);
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;

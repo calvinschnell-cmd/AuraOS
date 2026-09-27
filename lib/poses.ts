@@ -425,8 +425,21 @@ export const SIT_CROSS_ANIM: Animation = {
  * +/- 25 degrees three times over ~1.8s with a wrist flick, head tilt, lean,
  * knee bounce.
  */
-function buildWave(opts: { amplitude: number; cycles: number; halfCycleMs: number; shoulderZ: number; elbowZ: number }): Animation {
-  const { amplitude, cycles, halfCycleMs, shoulderZ, elbowZ } = opts;
+function buildWave(opts: {
+  amplitude: number;
+  cycles: number;
+  halfCycleMs: number;
+  shoulderZ: number;
+  elbowZ: number;
+  /** Knee bounce and head bob, 1 = full, 0 = none. */
+  bounce?: number;
+  /** Bored posture, 0 = none, 1 = slouched, head drooping and turned away. */
+  slouch?: number;
+  settleMs?: number;
+}): Animation {
+  const { amplitude, cycles, halfCycleMs, shoulderZ, elbowZ, bounce = 1, slouch = 0, settleMs = 380 } = opts;
+  const head = (roll: number): Vec3 => [slouch * 20, -slouch * 12, roll];
+  const rootY = -0.015 - slouch * 0.015;
   const base: Pose = {
     joints: {
       shoulderL: [-12, 0, shoulderZ],
@@ -434,35 +447,36 @@ function buildWave(opts: { amplitude: number; cycles: number; halfCycleMs: numbe
       wristL: [0, 0, 0],
       shoulderR: [0, 0, -6],
       elbowR: [-8, 0, 0],
-      head: [0, 0, 12],
-      spine: [0, 0, 4],
+      head: head(12),
+      spine: [slouch * 14, 0, 4],
       hipL: [0, 0, 2],
       hipR: [0, 0, -2],
       kneeL: [6, 0, 0],
       kneeR: [6, 0, 0],
     },
-    root: [0, -0.015, 0],
+    root: [0, rootY, 0],
     hands: { L: OPEN, R: RELAXED },
   };
   const keyframes: Keyframe[] = [{ pose: base, durationMs: 240, easing: "easeOut" }];
   for (let i = 0; i < cycles * 2; i++) {
     const dir = i % 2 === 0 ? 1 : -1;
+    const knee = dir > 0 ? 4 + 8 * bounce : 4;
     keyframes.push({
       pose: mergePoses(base, {
         joints: {
           elbowL: [0, 0, elbowZ + dir * amplitude],
           wristL: [0, 0, -dir * amplitude * 0.45],
-          head: [0, 0, 12 + dir * 2],
-          kneeL: [dir > 0 ? 12 : 4, 0, 0],
-          kneeR: [dir > 0 ? 12 : 4, 0, 0],
+          head: head(12 + dir * 2 * bounce),
+          kneeL: [knee, 0, 0],
+          kneeR: [knee, 0, 0],
         },
-        root: [0, dir > 0 ? -0.03 : -0.005, 0],
+        root: [0, rootY + (dir > 0 ? -0.015 : 0.01) * bounce, 0],
       }),
       durationMs: halfCycleMs,
       easing: "easeInOut",
     });
   }
-  keyframes.push({ pose: IDLE_POSE, durationMs: 380, easing: "easeInOut" });
+  keyframes.push({ pose: IDLE_POSE, durationMs: settleMs, easing: "easeInOut" });
   return { name: "wave", keyframes };
 }
 
@@ -652,6 +666,35 @@ export function idolAnimation(index: number): Animation {
 export function waveAnimation(side: Side, small = false): Animation {
   if (small) return side === "L" ? WAVE_SMALL_ANIM_L : WAVE_SMALL_ANIM_R;
   return side === "L" ? WAVE_ANIM_L : WAVE_ANIM_R;
+}
+
+/**
+ * Waving back again and again before a scan: the same wave, more bored each
+ * time. 0 = the full wave; 1 = one slow flap from a low arm, slouched, head
+ * drooping and turned away, no bounce.
+ */
+export function boredWaveAnimation(side: Side, boredom: number): Animation {
+  const b = Math.max(0, Math.min(1, boredom));
+  const lerp = (from: number, to: number) => from + (to - from) * b;
+  const wave: Animation = {
+    ...buildWave({
+      amplitude: lerp(25, 7),
+      cycles: b < 0.35 ? 3 : b < 0.75 ? 2 : 1,
+      halfCycleMs: Math.round(lerp(270, 560)),
+      shoulderZ: lerp(84, 34),
+      elbowZ: lerp(96, 84),
+      bounce: 1 - b,
+      slouch: b,
+      settleMs: Math.round(lerp(380, 720)),
+    }),
+    name: `waveBored${Math.round(b * 10)}`,
+  };
+  return side === "L" ? wave : mirrorAnimation(wave, `${wave.name}_R`);
+}
+
+/** Boredom for the Nth wave since the last scan (2 = the first wave back after the greeting). */
+export function waveBoredom(count: number): number {
+  return Math.max(0, Math.min(1, (count - 2) / 5));
 }
 
 /** All named presets, for the pose editor. */

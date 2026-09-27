@@ -33,7 +33,13 @@ describe("kiosk state machine", () => {
     expect(legendForState("SPINNING")).toEqual(["wave"]);
     expect(legendForState("ATTRACT")).toEqual(["wave"]);
     expect(gesturesForState("SPINNING")).toContain("double_peace");
-    expect(legendForState("READY")).toEqual(gesturesForState("READY"));
+    expect(legendForState("READY")).toEqual(gesturesForState("READY").filter((g) => g !== "wave"));
+  });
+
+  it("keeps answering waves after the greeting (a wave back, more bored each time)", () => {
+    expect(gesturesForState("READY")).toContain("wave");
+    expect(legendForState("READY")).not.toContain("wave");
+    expect(transition("READY", { type: "WAVE", side: "left" })).toBe("READY");
   });
 
   it("clowns a solo battle in place without starting one", () => {

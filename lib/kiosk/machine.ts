@@ -311,7 +311,8 @@ export function legendLabel(gesture: GestureId, state: KioskState): string {
  * gestures still work (gesturesForState).
  */
 export function legendForState(state: KioskState): GestureId[] {
-  return isIdleState(state) ? ["wave"] : gesturesForState(state);
+  // After the greeting a wave only gets a (more bored) wave back: it works, but is not advertised.
+  return isIdleState(state) ? ["wave"] : gesturesForState(state).filter((g) => g !== "wave");
 }
 
 /** Gestures that do something in the given state (drives what the engine allows). */
@@ -321,7 +322,7 @@ export function gesturesForState(state: KioskState): GestureId[] {
     case "ATTRACT":
       return ["wave", "double_peace", "double_fist", "thumb_up"];
     case "READY":
-      return ["double_fist", "double_peace", "thumb_up"];
+      return ["double_fist", "double_peace", "thumb_up", "wave"];
     case "GREETING":
     case "POSE_FOR_FANS":
       return ["double_peace", "double_fist"];

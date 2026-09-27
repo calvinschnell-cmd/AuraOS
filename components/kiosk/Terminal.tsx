@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TerminalEntry } from "@/lib/kiosk/types";
+
+/** A long line never takes longer than this to type (before the catch-up speed-up). */
+const MAX_LINE_MS = 900;
 
 interface Progress {
   index: number;
@@ -35,23 +38,34 @@ export function Terminal({
   const offset = baseId - firstId;
   const effectiveIndex = progress.index + offset;
 
+  // Typing runs on the clock, not one character per timer tick: the kiosk's
+  // main thread is busy (mannequin, trackers) and re-renders often, which used
+  // to delay or restart every tick. Each line remembers when it started.
+  const lineClock = useRef<{ id: number; start: number } | null>(null);
   useEffect(() => {
     if (effectiveIndex >= entries.length) return;
     const entry = entries[effectiveIndex];
-    const done = progress.chars >= entry.text.length;
-    const id = window.setTimeout(
-      () => {
-        if (done) {
-          setProgress({ index: effectiveIndex + 1, chars: 0 });
-          setBaseId(firstId);
-        } else {
-          setProgress((p) => ({ index: p.index, chars: p.chars + 1 }));
-        }
-      },
-      done ? lineGapMs : charMs,
-    );
-    return () => window.clearTimeout(id);
-  }, [entries, effectiveIndex, progress.chars, charMs, lineGapMs, firstId]);
+    if (lineClock.current?.id !== entry.id) lineClock.current = { id: entry.id, start: performance.now() };
+    const start = lineClock.current.start;
+    // Lines queued behind this one: type faster so the terminal keeps up with the kiosk.
+    const speed = entries.length - effectiveIndex;
+    const typeMs = Math.min(entry.text.length * charMs, MAX_LINE_MS) / speed;
+    const gapMs = lineGapMs / speed;
+    let timer = 0;
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      if (elapsed >= typeMs + gapMs) {
+        setProgress({ index: effectiveIndex + 1, chars: 0 });
+        setBaseId(firstId);
+        return;
+      }
+      const chars = typeMs <= 0 ? entry.text.length : Math.min(entry.text.length, Math.ceil((elapsed / typeMs) * entry.text.length));
+      setProgress((p) => (p.chars === chars ? p : { index: p.index, chars }));
+      timer = window.setTimeout(tick, charMs);
+    };
+    timer = window.setTimeout(tick, 0);
+    return () => window.clearTimeout(timer);
+  }, [entries, effectiveIndex, charMs, lineGapMs, firstId]);
 
   const typed = entries.slice(0, effectiveIndex);
   const current = entries[effectiveIndex];

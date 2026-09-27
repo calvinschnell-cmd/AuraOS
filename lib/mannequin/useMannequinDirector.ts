@@ -23,9 +23,11 @@ import {
   THINKING_ANIM,
   THUMBS_UP_ANIM,
   TYPING_ANIM,
+  boredWaveAnimation,
   idolAnimation,
   mirrorAnimation,
   waveAnimation,
+  waveBoredom,
   type Animation,
   type Side,
 } from "@/lib/poses";
@@ -346,16 +348,15 @@ export function useMannequinDirector(
     scene.play(SULK_EXIT_ANIM, 250);
   }, [sceneRef, ready, session.apologyTick, session.outfit]);
 
-  // Repeated waves after the greeting: one smaller, quicker wave back
-  // (smaller still when tired; none when annoyed).
+  // Repeated waves after the greeting: it always waves back, more bored every
+  // time (lower arm, slower, slouching, head drooping). Any scan resets it.
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene || !ready) return;
     if (session.waveTick === lastWaveTick.current) return;
     lastWaveTick.current = session.waveTick;
-    // The second wave still gets a full wave back; after that it shrinks, then stops.
-    if (state === "READY" && session.meltdown !== "annoyed") {
-      scene.play(waveAnimation(armForScreenSide(session.waveSide), session.hello.count > 2));
+    if (state === "READY") {
+      scene.play(boredWaveAnimation(armForScreenSide(session.waveSide), waveBoredom(session.hello.count)));
     }
-  }, [sceneRef, ready, state, session.waveTick, session.waveSide, session.meltdown, session.hello.count]);
+  }, [sceneRef, ready, state, session.waveTick, session.waveSide, session.hello.count]);
 }
