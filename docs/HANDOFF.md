@@ -20,7 +20,8 @@ feed a phone companion site. Data lives in Tiger Data (TimescaleDB).
 | --- | --- | --- |
 | Mirror (user side) | kiosk laptop, portrait monitor, `http://localhost:3000/kiosk?mode=mirror` | The kiosk. Full screen in its own Chrome profile (`%LOCALAPPDATA%\AuraOS\chrome-mirror`). |
 | Admin | `http://localhost:3000/admin` on the laptop, or https://www.aurafulos.tech/admin from anywhere | The one admin page (`/operator` and `/remote` redirect here): mirror status (what's on screen, camera, people in frame), OPEN MIRROR, controls, sign-ups (walk-ins, CALL UP, remove), live feed, standings with EDIT / DELETE, today's stats, phone QR (tap → full screen for judges). Controls include MUTE ALL, MUTE MUSIC and MUTE VOICE (labels flip to UNMUTE from the mirror's reported state). Unlock with `ADMIN_KEY` (remembered in localStorage). Works the same from the public server: see "Kiosk relay" below. |
-| Phones | https://www.aurafulos.tech (also https://aurafulos.tech, https://155-138-165-43.sslip.io) | An app shell (`components/companion/AppShell.tsx`): sticky top bar + bottom tab bar HOME · FEED · BOARD · ME (JOIN until you have an AURA ID). `/me`: get an AURA ID, or jumps to your profile. `/feed`: card just scanned (react live) + FEED (last 30 min) and STANDINGS (top 10, tap → card) tabs. `/r/[id]`: a card (react, BEAT THIS SCORE → queue, THIS WAS ME → claim). `/u/[handle]`: shareable profile (every card tied to the AURA ID). `/leaderboard`: big-screen Tide Chart (its QR opens `/feed?tab=standings`). |
+| Phones | https://www.aurafulos.tech (also https://aurafulos.tech, https://155-138-165-43.sslip.io). **Devpost / demo link: https://www.aurafulos.tech/scan** | An app shell (`components/companion/AppShell.tsx`): sticky top bar + bottom tab bar SCAN · FEED · BOARD · ME (JOIN until you have an AURA ID). `/scan`: phone scans. `/feed`: every card (mirror, phone, challenge battles), newest first, live. `/leaderboard`: phone board with your best entry. `/r/[id]`: a card (SHARE, breakdown, SCAN YOURS or CHALLENGE A FRIEND, BEAT IT AT THE MIRROR → queue, THIS WAS ME). `/c/[id]`: a challenge link. `/me`, `/u/[handle]`: AURA ID + profile. See "Phone companion" below. |
+| Big screen | `/tv` | The Tide Chart (was `/leaderboard`); its QR opens the phone `/leaderboard`. Old `/feed?tab=standings` links redirect there too. |
 
 Launch both screens: `npm run kiosk:launch` (mirror on the portrait display,
 admin on the main one). `npm run kiosk:launch -- -MirrorOnly` reopens only
@@ -40,6 +41,59 @@ a "↑ N NEW CARDS" pill when cards arrive while scrolled down, blinking loading
 placeholders. Everything is off under `prefers-reduced-motion`. The feed tab
 lives in the URL (`?tab=standings`), so the tab bar's BOARD and the in-page
 tabs stay in sync.
+
+### Phone companion (mobile web, 2026-09-26)
+
+Anyone can use AURA OS from a phone (or a desktop browser); the mirror stays the showpiece.
+No music or voice on any phone page. Phone pages load no Three.js / MediaPipe (`/scan` is
+~36 KB gzip of page JS).
+
+- **Scan** (`/scan` → `POST /api/scan/quick`): name once (AURA ID), TAKE PHOTO
+  (`capture="environment"`) or CHOOSE FROM LIBRARY, shrink to 1024 px JPEG 0.8 on the phone,
+  upload with progress, score with the same `processScan` (one judge, `source: "mobile"`),
+  then the phone draws the same share card as the mirror (face blurred, JPEG) and posts it to
+  `/api/cards`, and lands on `/r/[id]`. RETRY resumes the failed step. Server side: sniffed
+  JPEG/PNG/WebP only, 5 MB max, EXIF/GPS stripped (`lib/server/imageSafety.ts`), 5 scans / 10
+  min per phone and 30 / 10 min per IP (the venue shares one IP), phone scans capped at 400 of
+  the 600 daily (`MOBILE_DAILY_SCAN_CAP`). Raw photos are not kept (`STORE_RAW_PHOTOS=false`).
+  No voice roast, no Solana badge.
+- **Classifier**: `CLASSIFIER_MODE=local|remote|skip` wraps the garment segmenter (the "GPU
+  classifier"); down/slow = skipped and logged. `deploy.sh` forces `skip` on the Vultr box (no
+  GPU). The pose classifier needs the mirror's live landmarks, so phone scans have no pose.
+- **Result page** `/r/[id]`: SHARE YOUR CARD (native share sheet with the card image, else copy
+  link + DOWNLOAD), mirror/phone chip, breakdown, OG + Twitter tags (the card is og:image;
+  `metadataBase` = `PUBLIC_BASE_URL`). The phone that made a card sees CHALLENGE A FRIEND
+  (`GET /api/cards/[id]/mine`; device ids never leave the server); visitors see SCAN YOURS.
+- **Mirror QR codes**: idle screen shows a large black-on-white QR to `/scan` (under the mode
+  select); the claim QR (after thumbs up) is its own high-contrast render as wide as the mirror
+  panel (~10-11 cm at the default 45% panel; raise MIRROR PANEL in settings if it won't scan
+  from 1.5 m).
+- **Leaderboard** `/leaderboard`: top 25, polled every 5 s (same as the mirror), your best entry
+  and rank (by device id or AURA ID) highlighted or pinned under the list.
+- **Feed** `/feed`: every card newest first (no 30-minute window any more), infinite scroll,
+  8 s poll, handle + source per item, reactions as before.
+- **Admin removal**: `POST /api/admin/remove { cardId }` with `x-admin-key: ADMIN_KEY` (or
+  `Authorization: Bearer`), or HIDE on the `/admin` feed. Hides the card, its image, its `/r/`
+  page and the solo board entry (nothing deleted; `cards.hidden_at`, `leaderboard_entries.hidden`).
+  Open feeds drop it within ~8 s, open result pages within 15 s, the board on its next poll.
+- **Challenge by link** `/c/[id]` (12-char lowercase random id, one per card): friends see the
+  challenger's card with the score blacked out, SCAN YOUR FIT TO ACCEPT → `/scan?c=[id]` → the
+  new card battles the stored scan (`lib/server/duels.ts`: `createBattle` + `commentaryStream`,
+  pose neutral both sides so the fit decides; kiosk battles untouched) → a "challenge" feed post
+  (both cards side by side, rendered with `next/og` in `lib/server/duelImage.tsx`). Any number of
+  friends; the challenger and anyone who accepted see every result (polled). Self-accept refused.
+- **Data** (Tiger, applied by `npm run db:setup` / first use): `scans.source`,
+  `cards.source/device_id/hidden_at`, `leaderboard_entries.source/device_id/hidden`, `duels`,
+  `duel_accepts`, `raw_photos` (unused unless `STORE_RAW_PHOTOS=true`). Memory store mirrors it.
+- **Timing** (real judges, local, fast connection): photo picked → result page 3.1-4.0 s (server
+  1.6-3.7 s, nearly all the vision call); challenge accept adds ~2.8 s (commentary + image).
+  Venue wifi adds the uploads (~150 KB photo, ~370 KB card).
+- **Not verified on real devices yet**: iOS Safari / Android Chrome share sheet with the image
+  file, the camera capture input, the two-phone challenge on the live site, and the mirror QRs
+  scanned through the acrylic at 1.5 m. html-to-image on iOS gets a warm-up pass
+  (`renderCardJpeg`); if cards still come out blank there, that's the first thing to check.
+- Dev: `aura-os-mobile` launch config (MOCK MODE, :3300, `ADMIN_KEY=mobile-test-key`);
+  `aura-os-timing` (:3400) uses the real OpenAI key with an in-memory store.
 
 ### Kiosk audio
 
@@ -216,5 +270,5 @@ server.
   tools, or write the snippet to a file and append it.
 - `next dev` adds each dist dir it sees (`.next-mock`, `.next-demo`) to
   `tsconfig.json` includes; eslint ignores them in `eslint.config.mjs`.
-- Verify with `npm run lint`, `npm run typecheck`, `npm test` (208 tests), and
+- Verify with `npm run lint`, `npm run typecheck`, `npm test` (230 tests), and
   `npm run build` (don't build into `.next` while `next dev` is running).

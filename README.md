@@ -85,10 +85,13 @@ Open <http://localhost:3000>. The launcher links to every route. Setting up a fr
 | ------------------- | ------------------------------------------------------------------- |
 | `/kiosk?mode=digital` | Main experience over the flipped camera feed (default)            |
 | `/kiosk?mode=mirror`  | Two-way mirror layout (pure black, cyan only)                     |
-| `/r/[id]`           | Companion app: the result a card's QR lands on (card, BEAT THIS SCORE → challenger queue, caption, reactions, "this was me") |
-| `/feed`             | Companion app: every saved card, newest first, with reactions        |
+| `/scan`             | Phone scans: take or pick a photo, get scored, land on your card (`?c=[id]` accepts a challenge) |
+| `/r/[id]`           | Companion app: the result a card's QR lands on (card, SHARE, breakdown, SCAN YOURS / CHALLENGE A FRIEND, BEAT IT AT THE MIRROR → challenger queue, reactions, "this was me") |
+| `/c/[id]`           | Challenge link: the challenger's card (score hidden until you scan), scan to battle, every result |
+| `/feed`             | Companion app: every card (mirror + phones + challenge battles), newest first, live, with reactions |
+| `/leaderboard`      | Phone leaderboard: live top 25, your best entry and rank highlighted, mirror/phone markers |
 | `/card/[id]`        | Old card links: redirects to `/r/[id]`                               |
-| `/leaderboard`      | Full-screen Tide Chart: squad champion, rivalry of the day, streaks, most improved |
+| `/tv`               | Full-screen Tide Chart (big screen): squad champion, rivalry of the day, streaks, most improved |
 | `/admin`            | The one admin page (ADMIN_KEY): mirror status, OPEN MIRROR, remote controls (battle, squad, scan/capture, start, wave, reset, mute, mode), sign-ups, live feed, standings with delete, today's stats, phone QR for judges. `/operator` and `/remote` redirect here. |
 | `/certificate/[id]` | Hidden print page (US Letter) opened by the kiosk when printing     |
 | `/pose-editor`      | Developer tool (hidden): joints, presets, animations, clothing, clipping |
@@ -105,6 +108,12 @@ See [`.env.example`](./.env.example).
 | `OPENAI_MODEL`                  | Override the scoring/roast model (default `gpt-4o-mini`)       |
 | `OPENAI_IMAGE_DETAIL`           | `high` (default, better boxes), `low` (cheaper), or `auto`     |
 | `ML_SERVICE_URL`                | Segmenter URL (default `http://127.0.0.1:8001`; `off` to skip) |
+| `CLASSIFIER_MODE`               | Garment classifier (segmenter): `local` (default, `ML_SERVICE_URL`), `remote` (`CLASSIFIER_URL`), `skip`. Down or slow = skipped + logged, never a failed scan. The public server uses `skip` |
+| `CLASSIFIER_URL`, `CLASSIFIER_TIMEOUT_MS` | Remote classifier URL; timeout (default 4000 ms)       |
+| `SCAN_RATE_LIMIT`, `SCAN_RATE_LIMIT_IP`, `SCAN_RATE_WINDOW_MIN` | Phone scans per device (5) and per IP (30) per window (10 min) |
+| `SCAN_MAX_UPLOAD_BYTES`         | Phone upload limit (default 5 MB)                              |
+| `MOBILE_DAILY_SCAN_CAP`         | Phone scans' share of `DAILY_SCAN_CAP` (default 400, so the mirror keeps the rest) |
+| `STORE_RAW_PHOTOS`              | `true` keeps the EXIF-stripped phone upload (`raw_photos`); default `false` |
 | `DAILY_SCAN_CAP`                | Max real analysis calls per day (default 600)                  |
 | `KIOSK_TIMEZONE`                | Defines "today" for caps and ranks (default America/New_York)  |
 | `OPENAI_INPUT_USD_PER_M`, `OPENAI_OUTPUT_USD_PER_M` | List prices for the debug overlay spend estimate (0.15 / 0.6) |
@@ -197,6 +206,14 @@ samples to `ml-service/pose/recorded.jsonl` (dev server only); `npm run pose:tra
 - **Reactions**: 🔥 💀 👑 🤡, one per phone per emoji.
 - **BEAT THIS SCORE**: joins the challenger queue; the kiosk's mode select shows **UP NEXT** and
   the announcer calls the challenger up.
+- **Phone scans** (`/scan`, `POST /api/scan/quick`): the same `processScan` pipeline (one judge,
+  tagged `source: mobile`), JPEG/PNG/WebP up to 5 MB, EXIF stripped, per-phone and per-IP limits.
+  The phone draws the same share card (face blurred, JPEG) and posts it like the mirror does.
+- **Challenge by link** (`/c/[id]`): CHALLENGE A FRIEND on your own card; each friend who scans gets
+  an async battle against the stored scan (`createBattle` + `commentaryStream`, pose neutral on
+  both sides) and a "challenge" feed post rendered on the server.
+- **Admin removal**: `POST /api/admin/remove { cardId }` (ADMIN_KEY) or HIDE on `/admin` hides a
+  card from the feed, its page and the board; open pages drop it on their next poll.
 
 ## Analysis pipeline (segmenter + two AI judges)
 

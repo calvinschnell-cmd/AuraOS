@@ -85,6 +85,7 @@ Plex Mono, and no rounded corners.
 | Lightweight identity | Name → AURA ID (NAME#CODE) cached in localStorage (`lib/companion/identity.ts`); "THIS WAS ME" claims a slot (`/api/feed/[id]/claim`). |
 | No accounts / follows / DMs / comments | None built. |
 | Separately deployable | Plain pages in the same Next app; deploy the repo to Vercel/Netlify and point `PUBLIC_BASE_URL` (card QRs) at it. |
+| Phone scans, challenge links, phone leaderboard, admin removal | `/scan`, `/c/[id]`, `/leaderboard`, `/api/admin/remove`: see "Phone companion" in [HANDOFF.md](./HANDOFF.md). |
 
 ## 7. Card design
 

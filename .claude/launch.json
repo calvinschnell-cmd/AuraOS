@@ -20,6 +20,13 @@
       "env": { "AURA_DIST_DIR": ".next-mobile", "ADMIN_KEY": "mobile-test-key" },
       "port": 3300,
       "autoPort": true
+    },
+    {
+      "name": "aura-os-timing",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "--port", "3400"],
+      "env": { "AURA_DIST_DIR": ".next-mobile", "TIGER_DATABASE_URL": "", "CLASSIFIER_MODE": "skip", "ELEVENLABS_API_KEY": "", "SOLANA_BADGES_ENABLED": "false", "PRINTING_ENABLED": "false" },
+      "port": 3400
     }
   ]
 }
