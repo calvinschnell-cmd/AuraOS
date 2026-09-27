@@ -1,6 +1,6 @@
 import { rootCertificates, type ConnectionOptions } from "node:tls";
 import { Pool, type PoolClient } from "pg";
-import type { HottestHour, JudgeSplit, LeaderboardEntry, PlayerHistory, PlayerInfo, ScanSource, TimelineBucket } from "@/lib/kiosk/types";
+import { isLeaderboardBoard, type HottestHour, type JudgeSplit, type LeaderboardBoard, type LeaderboardEntry, type PlayerHistory, type PlayerInfo, type ScanSource, type TimelineBucket } from "@/lib/kiosk/types";
 import { makeHandle, newHandleCode } from "@/lib/players";
 import type { Analysis } from "@/lib/schema";
 import type { JudgeId, ScoreBreakdown } from "@/lib/scoring";
@@ -9,7 +9,7 @@ import type { BattleOutcome } from "@/lib/battle/types";
 import type { FeedEntry } from "@/lib/feed/types";
 import type { CardKind } from "@/lib/share/caption";
 import type { Duel, DuelAccept } from "@/lib/duels/types";
-import { emptyReactions, feedEntryOf, type NewCard, type NewLeaderboardEntry, type ScanStore, type StoredBattle, type StoredCard, type StoredScan } from "./store";
+import { defaultBoard, emptyReactions, feedEntryOf, type NewCard, type NewLeaderboardEntry, type ScanStore, type StoredBattle, type StoredCard, type StoredScan } from "./store";
 import { TIGER_SCHEMA } from "./tigerSchema";
 import { TIMESCALE_CA_PEM } from "./timescaleCa";
 
@@ -77,6 +77,7 @@ interface EntryRow {
   standout: string | null;
   created_at: Date;
   source: string;
+  board: string | null;
 }
 
 /** Ids are uuid columns: anything else (a bad URL, a typo) is simply not found instead of a SQL error. */
@@ -94,6 +95,7 @@ const toEntry = (r: EntryRow): LeaderboardEntry => ({
   standout: r.standout,
   createdAt: r.created_at.toISOString(),
   source: sourceOf(r.source),
+  board: isLeaderboardBoard(r.board) ? r.board : defaultBoard(sourceOf(r.source)),
 });
 interface CardRow {
   id: string;
@@ -162,7 +164,7 @@ interface AcceptRow {
 const toDuel = (r: DuelRow): Duel => ({ id: r.id, cardId: r.card_id, scanId: r.scan_id, deviceId: r.device_id, createdAt: r.created_at.toISOString() });
 
 const SCAN_COLS = "id, image_hash, aura, analysis, breakdown, created_at, source";
-const ENTRY_COLS = "id, scan_id, handle, nickname, aura, standout, created_at, source";
+const ENTRY_COLS = "id, scan_id, handle, nickname, aura, standout, created_at, source, board";
 
 export class TigerStore implements ScanStore {
   readonly kind = "tiger" as const;
@@ -310,8 +312,8 @@ export class TigerStore implements ScanStore {
     const scan = await this.getById(entry.scanId);
     const standout = scan ? ([...scan.analysis.items].sort((a, b) => b.uniqueness - a.uniqueness)[0]?.name ?? null) : null;
     await (await this.db()).query(
-      `INSERT INTO leaderboard_entries (id, scan_id, handle, nickname, aura, standout, source, device_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (scan_id) DO NOTHING`,
-      [entry.id, entry.scanId, entry.handle, entry.nickname, entry.aura, standout, entry.source ?? "mirror", entry.deviceId ?? null],
+      `INSERT INTO leaderboard_entries (id, scan_id, handle, nickname, aura, standout, source, device_id, board) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (scan_id) DO NOTHING`,
+      [entry.id, entry.scanId, entry.handle, entry.nickname, entry.aura, standout, entry.source ?? "mirror", entry.deviceId ?? null, entry.board ?? defaultBoard(entry.source)],
     );
   }
   async entryForScan(scanId: string) {
@@ -319,22 +321,25 @@ export class TigerStore implements ScanStore {
     const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE scan_id = $1`, [scanId]);
     return rows[0] ? toEntry(rows[0]) : null;
   }
-  async leaderboard(limit: number) {
-    const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden ORDER BY aura DESC, created_at ASC LIMIT $1`, [limit]);
+  async leaderboard(limit: number, board?: LeaderboardBoard) {
+    const { rows } = await (await this.db()).query<EntryRow>(
+      `SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden AND ($2::text IS NULL OR board = $2) ORDER BY aura DESC, created_at ASC LIMIT $1`,
+      [limit, board ?? null],
+    );
     return rows.map(toEntry);
   }
-  async viewerBest(deviceId: string | null, handle: string | null) {
+  async viewerBest(deviceId: string | null, handle: string | null, board?: LeaderboardBoard) {
     if (!deviceId && !handle) return null;
     const db = await this.db();
     const { rows } = await db.query<EntryRow>(
-      `SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden AND (device_id = $1 OR handle = $2) ORDER BY aura DESC, created_at ASC LIMIT 1`,
-      [deviceId, handle?.toUpperCase() ?? null],
+      `SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden AND ($3::text IS NULL OR board = $3) AND (device_id = $1 OR handle = $2) ORDER BY aura DESC, created_at ASC LIMIT 1`,
+      [deviceId, handle?.toUpperCase() ?? null, board ?? null],
     );
     const best = rows[0];
     if (!best) return null;
     const { rows: r } = await db.query<{ n: string }>(
-      `SELECT count(*) AS n FROM leaderboard_entries WHERE NOT hidden AND (aura > $1 OR (aura = $1 AND created_at < $2))`,
-      [best.aura, best.created_at],
+      `SELECT count(*) AS n FROM leaderboard_entries WHERE NOT hidden AND ($3::text IS NULL OR board = $3) AND (aura > $1 OR (aura = $1 AND created_at < $2))`,
+      [best.aura, best.created_at, board ?? null],
     );
     return { entry: toEntry(best), rank: Number(r[0].n) + 1 };
   }

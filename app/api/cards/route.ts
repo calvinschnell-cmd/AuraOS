@@ -96,15 +96,19 @@ export async function POST(request: Request): Promise<NextResponse> {
         // Only a registered handle links the scan to a history (see /api/players).
         const handle = handleInput ? ((await store.getPlayer(handleInput).catch(() => null))?.handle ?? null) : null;
         const entryId = randomUUID();
-        await store.insertLeaderboard({ id: entryId, scanId: scan.id, nickname, aura: scan.aura, handle, source, deviceId });
-        entry = (await store.entryForScan(scan.id)) ?? { id: entryId, scanId: scan.id, nickname, aura: scan.aura, createdAt: new Date().toISOString(), standout: null, handle, source };
+        const board = source === "mobile" ? "mobile" : "solo";
+        await store.insertLeaderboard({ id: entryId, scanId: scan.id, nickname, aura: scan.aura, handle, source, deviceId, board });
+        entry = (await store.entryForScan(scan.id)) ?? { id: entryId, scanId: scan.id, nickname, aura: scan.aura, createdAt: new Date().toISOString(), standout: null, handle, source, board };
       }
     }
-    // A battle card puts every player on the board (their total: fit + pose), once per scan.
+    // A battle card puts every player on its mode's board (their total: fit + pose), once per scan.
     if (battle && !parentId) {
+      const board = battle.mode === "squad" ? "squad" : "duo";
       for (const p of battle.players) {
         if (await store.entryForScan(p.scanId)) continue;
-        await store.insertLeaderboard({ id: randomUUID(), scanId: p.scanId, nickname: cleanNickname(p.nickname), aura: p.total, handle: p.handle }).catch((err) => console.warn("[aura] battle entry failed", err));
+        await store
+          .insertLeaderboard({ id: randomUUID(), scanId: p.scanId, nickname: cleanNickname(p.nickname), aura: p.total, handle: p.handle, board })
+          .catch((err) => console.warn("[aura] battle entry failed", err));
       }
     }
     const body: CardResponse = { id: saved.id, url: saved.imageUrl, pageUrl: `${publicBaseUrl(request)}/r/${saved.id}`, entry };

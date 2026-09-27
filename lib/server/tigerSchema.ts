@@ -120,6 +120,16 @@ export const TIGER_SCHEMA: readonly string[] = [
   `ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS leaderboard_entries_device_idx ON leaderboard_entries (device_id) WHERE device_id IS NOT NULL`,
   `CREATE INDEX IF NOT EXISTS cards_hidden_idx ON cards (hidden_at) WHERE hidden_at IS NOT NULL`,
+  // Four boards (solo / duo / squad / mobile): battle totals include the pose, solo and phone
+  // scans do not, so they rank separately. Backfill only touches rows without a board yet:
+  // phone uploads, then battle players by the battle's mode, the rest are mirror solo scans.
+  `ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS board text`,
+  `UPDATE leaderboard_entries SET board = 'mobile' WHERE board IS NULL AND source = 'mobile'`,
+  `UPDATE leaderboard_entries e SET board = CASE WHEN b.mode = 'squad' THEN 'squad' ELSE 'duo' END
+     FROM battle_players bp JOIN battles b ON b.id = bp.battle_id
+     WHERE e.board IS NULL AND bp.scan_id = e.scan_id`,
+  `UPDATE leaderboard_entries SET board = 'solo' WHERE board IS NULL`,
+  `CREATE INDEX IF NOT EXISTS leaderboard_entries_board_idx ON leaderboard_entries (board, aura DESC)`,
   // Only written with STORE_RAW_PHOTOS=true (off by default): the EXIF-stripped upload.
   `CREATE TABLE IF NOT EXISTS raw_photos (
     scan_id uuid PRIMARY KEY,

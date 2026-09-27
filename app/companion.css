@@ -1208,3 +1208,16 @@ a.standings__row:active {
   margin: 0.5rem 0;
   font-size: 0.7rem;
 }
+
+/* leaderboard: four boards (solo / duo / squad / mobile) in one segmented control */
+.feed-tabs--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+.feed-tabs--4 .feed-tabs__slider {
+  width: 25%;
+}
+.feed-tabs--4 .feed-tabs__tab {
+  padding: 0.6rem 0.2rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}

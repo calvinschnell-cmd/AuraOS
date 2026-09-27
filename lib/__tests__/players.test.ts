@@ -70,7 +70,7 @@ describe("Tiger schema", () => {
     expect(sql).toMatch(/create_hypertable\('judge_scores'/);
     expect(sql).toMatch(/timescaledb\.continuous, timescaledb\.materialized_only = false/);
     expect(sql).toMatch(/add_continuous_aggregate_policy\('aura_15m'/);
-    // Every statement is idempotent (safe to re-run on each boot).
-    for (const s of TIGER_SCHEMA) expect(s).toMatch(/IF NOT EXISTS|if_not_exists => TRUE/);
+    // Every statement is idempotent (safe to re-run on each boot); backfills only touch rows still unset.
+    for (const s of TIGER_SCHEMA) expect(s).toMatch(/IF NOT EXISTS|if_not_exists => TRUE|^UPDATE [\s\S]*\bIS NULL\b/);
   });
 });

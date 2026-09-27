@@ -254,6 +254,24 @@ export interface LeaderboardEntry {
   cardId?: string | null;
   /** Scanned at the mirror or on a phone (/scan). Older rows: mirror. */
   source?: ScanSource;
+  /** Which board it ranks on (scores are only comparable within one). */
+  board?: LeaderboardBoard;
+}
+
+/**
+ * The four boards. Scores are not comparable across them: a battle total adds
+ * the pose to the fit, a mirror solo scan has two judges and no pose, a phone
+ * upload one judge and no pose.
+ *   solo    mirror solo scans
+ *   duo     1v1 battle players (fit + pose)
+ *   squad   squad battle players (fit + pose)
+ *   mobile  phone uploads (/scan)
+ */
+export type LeaderboardBoard = "solo" | "duo" | "squad" | "mobile";
+export const LEADERBOARD_BOARDS: readonly LeaderboardBoard[] = ["solo", "duo", "squad", "mobile"];
+
+export function isLeaderboardBoard(v: unknown): v is LeaderboardBoard {
+  return typeof v === "string" && (LEADERBOARD_BOARDS as readonly string[]).includes(v);
 }
 
 /** Where a scan was taken. */
@@ -315,6 +333,8 @@ export interface LeaderboardSnapshot {
   at: number;
   /** The viewer's own best entry and rank (phones send their device id / AURA ID); null when they have none. */
   you?: { entry: LeaderboardEntry; rank: number } | null;
+  /** The board `top` and `you` are ranked on (?board=); absent = every entry together. */
+  board?: LeaderboardBoard;
 }
 
 /** JSON body returned by POST /api/scan/quick (phone scans). */

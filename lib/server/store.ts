@@ -1,7 +1,7 @@
 import type { TokenUsage } from "@/lib/analyze";
 import { DAILY_SCAN_CAP, OPENAI_INPUT_USD_PER_M, OPENAI_MODEL, OPENAI_OUTPUT_USD_PER_M } from "@/lib/config";
 import { isMockMode } from "@/lib/env";
-import type { HottestHour, JudgeSplit, LeaderboardEntry, PlayerHistory, PlayerInfo, RemoteCommand, ScanSource, StoreKind, TimelineBucket, UsageStats } from "@/lib/kiosk/types";
+import type { HottestHour, JudgeSplit, LeaderboardBoard, LeaderboardEntry, PlayerHistory, PlayerInfo, RemoteCommand, ScanSource, StoreKind, TimelineBucket, UsageStats } from "@/lib/kiosk/types";
 import type { KioskStatus } from "@/lib/kiosk/status";
 import { makeHandle, newHandleCode } from "@/lib/players";
 import type { Analysis } from "@/lib/schema";
@@ -75,6 +75,13 @@ export interface NewLeaderboardEntry {
   handle: string | null;
   source?: ScanSource;
   deviceId?: string | null;
+  /** Defaults from the source: mobile -> "mobile", else "solo". Battle players pass "duo" / "squad". */
+  board?: LeaderboardBoard;
+}
+
+/** The board an entry ranks on when the caller did not say. */
+export function defaultBoard(source: ScanSource | undefined): LeaderboardBoard {
+  return source === "mobile" ? "mobile" : "solo";
 }
 
 /** The viewer's own best leaderboard entry and its rank (1-based, among visible entries). */
@@ -142,10 +149,11 @@ export interface ScanStore {
   hiddenCardIds(since: string): Promise<string[]>;
 
   insertLeaderboard(entry: NewLeaderboardEntry): Promise<void>;
-  /** The viewer's best visible entry (their phone's scans, or their AURA ID) and its rank. */
-  viewerBest(deviceId: string | null, handle: string | null): Promise<ViewerBest | null>;
+  /** The viewer's best visible entry (their phone's scans, or their AURA ID) and its rank, on one board or across all. */
+  viewerBest(deviceId: string | null, handle: string | null, board?: LeaderboardBoard): Promise<ViewerBest | null>;
   entryForScan(scanId: string): Promise<LeaderboardEntry | null>;
-  leaderboard(limit: number): Promise<LeaderboardEntry[]>;
+  /** Top entries on one board, or across all of them when `board` is omitted. */
+  leaderboard(limit: number, board?: LeaderboardBoard): Promise<LeaderboardEntry[]>;
   recentEntries(limit: number): Promise<LeaderboardEntry[]>;
   /**
    * The card to open for each scan (scan id -> card id): its own card (solo, or
@@ -268,7 +276,7 @@ type MemoryEntry = LeaderboardEntry & { deviceId?: string | null; hidden?: boole
 function publicEntry(e: MemoryEntry): LeaderboardEntry {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { deviceId, hidden, ...rest } = e;
-  return { ...rest, source: rest.source ?? "mirror" };
+  return { ...rest, source: rest.source ?? "mirror", board: rest.board ?? defaultBoard(rest.source) };
 }
 
 export class MemoryStore implements ScanStore {
@@ -364,6 +372,7 @@ export class MemoryStore implements ScanStore {
     this.s.entries.push({
       ...entry,
       source: entry.source ?? "mirror",
+      board: entry.board ?? defaultBoard(entry.source),
       deviceId: entry.deviceId ?? null,
       createdAt: new Date().toISOString(),
       standout: scan ? standoutItem(scan.analysis) : null,
@@ -373,15 +382,17 @@ export class MemoryStore implements ScanStore {
     const e = this.s.entries.find((x) => x.scanId === scanId);
     return e ? publicEntry(e) : null;
   }
-  private ranked(): MemoryEntry[] {
-    return this.s.entries.filter((e) => !e.hidden).sort((a, b) => b.aura - a.aura || a.createdAt.localeCompare(b.createdAt));
+  private ranked(board?: LeaderboardBoard): MemoryEntry[] {
+    return this.s.entries
+      .filter((e) => !e.hidden && (!board || (e.board ?? defaultBoard(e.source)) === board))
+      .sort((a, b) => b.aura - a.aura || a.createdAt.localeCompare(b.createdAt));
   }
-  async leaderboard(limit: number) {
-    return this.ranked().slice(0, limit).map(publicEntry);
+  async leaderboard(limit: number, board?: LeaderboardBoard) {
+    return this.ranked(board).slice(0, limit).map(publicEntry);
   }
-  async viewerBest(deviceId: string | null, handle: string | null) {
+  async viewerBest(deviceId: string | null, handle: string | null, board?: LeaderboardBoard) {
     const h = handle?.toUpperCase() ?? null;
-    const ranked = this.ranked();
+    const ranked = this.ranked(board);
     const i = ranked.findIndex((e) => (deviceId !== null && e.deviceId === deviceId) || (h !== null && e.handle === h));
     return i < 0 ? null : { entry: publicEntry(ranked[i]), rank: i + 1 };
   }

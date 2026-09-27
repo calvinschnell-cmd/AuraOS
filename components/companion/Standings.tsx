@@ -87,7 +87,10 @@ export function Standings({
   const { top, narrative } = snapshot;
   const you = snapshot.you ?? null;
   if (top.length === 0) return <p className="companion__note">{emptyNote}</p>;
-  const champ = narrative?.squadChampion ?? null;
+  // On a single board, only its own story: the squad champion on GROUPS, the rivalry on DUOS.
+  const board = snapshot.board;
+  const champ = !board || board === "squad" ? (narrative?.squadChampion ?? null) : null;
+  const rivalry = !board || board === "duo" ? (narrative?.rivalry ?? null) : null;
   const shown = top.slice(0, limit);
   const youShown = you !== null && shown.some((e) => e.id === you.entry.id);
   return (
@@ -100,10 +103,10 @@ export function Standings({
           </span>
         </Link>
       )}
-      {narrative?.rivalry && (
+      {rivalry && (
         <div className="standings__special standings__special--static">
           <span className="font-heading">⚔️ RIVALRY OF THE DAY</span>
-          <span className="standings__special-body">{rivalryLine(narrative.rivalry)}</span>
+          <span className="standings__special-body">{rivalryLine(rivalry)}</span>
         </div>
       )}
       <ol className="standings__list">
