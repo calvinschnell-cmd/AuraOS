@@ -71,11 +71,19 @@ export const SPECIALNESS_RULES = `- specialness: how far this fit is from ordina
 - Fit crimes, judged hard: shorts are an L unless the whole fit is clearly built around them (keep specialness at 55 or below and lean negative). Clashing colorways (loud colors that fight each other) and pieces that do not go together are an L: rate them low and negative, never "bold".`;
 
 /** Both judges: map the clothes to the style they actually say (dresses were landing on "professional"). */
+/**
+ * Both judges: whose outfit this is, and to look at every layer (GPT's item
+ * list used to stop at "sweater + pants" and miss the shirt and tie under it).
+ */
+const SUBJECT_AND_LAYERS = `- Whose outfit: judge only the person the scan is for, the one nearest the camera and most centered (usually the largest body in frame). Ignore anyone or anything in the background.
+- Look at every layer, top to bottom: a shirt collar or cuffs showing under a sweater or quarter-zip is its own item (e.g. "white oxford shirt"), a tie at the neckline is an accessory, and so are belts, watches, jewelry and bags. Name the shoes you can actually see.`;
+
 const STYLE_HINT = `Pick what the clothes actually say: dresses, skirts, heels, bows, ballet flats, flowy or sparkly pieces usually mean coquette, balletcore, boho, glam, clean girl or cottagecore, not professional or old money.`;
 
 /** Sent with the photo. Restates the enums so the model stays in bounds. */
 export const USER_PROMPT = `Analyze the outfit in this photo and return ONLY the JSON object.
 - style_mix: the top 3 styles from this list, percents summing to 100: ${STYLES.join(", ")}. ${STYLE_HINT}
+${SUBJECT_AND_LAYERS}
 - items: every visible clothing item and accessory, each named in plain words like a person would ("orange bomber jacket", "baggy camel cargos"), never by a region label like "Upper-clothes". category must be one of: ${ITEM_CATEGORIES.join(", ")}.
 - box_2d and face_box are { ymin, xmin, ymax, xmax } normalized to 0-1000 of the image.
 - face_box: the bounding box of the face if visible, else null.
@@ -99,6 +107,8 @@ export const BATTLE_ROAST_PROMPT = `Two outfits were scored. The second one lost
 /** Gemini, the second judge: rates the same photo independently (lightweight: no boxes or item list). */
 export const JUDGE_PROMPT = `You are one of two independent judges scoring this outfit. Return ONLY the JSON object.
 - is_outfit_photo: false if no outfit is visible.
+${SUBJECT_AND_LAYERS}
+- items: every visible clothing item and accessory on that person, named in plain words like a person would ("white oxford shirt", "burgundy tie", "brown penny loafers"). category must be one of: ${ITEM_CATEGORIES.join(", ")}. box_2d is [ymin, xmin, ymax, xmax] normalized to 0-1000 of the image. uniqueness 0-100: basic items everyone owns 5-25, ordinary 35-55, rare, custom, vintage or standout 80-100.
 ${SPECIALNESS_RULES}
 - verdict: your own one-line verdict (max 20 words). Ordinary fits get a dry one-liner; standouts get unhinged praise (W) or a brutal clothes-only roast (L).
 - nickname: at most 30 characters, plain words describing the fit, e.g. "Vintage Racing Jacket Guy".

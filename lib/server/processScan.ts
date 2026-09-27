@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { AnalysisError, getAnalysisProvider, type AnalysisResult } from "@/lib/analyze";
 import { DAILY_SCAN_CAP } from "@/lib/config";
-import { analysisFromGemini, geminiJudgeInput, getGeminiJudge, type GeminiVerdict } from "@/lib/judges/gemini";
+import { analysisFromGemini, geminiItems, geminiJudgeInput, getGeminiJudge, mergeJudgeItems, type GeminiVerdict } from "@/lib/judges/gemini";
 import type { Analysis } from "@/lib/schema";
 import { adaptiveCutoff, gptJudge, scoreScan, type JudgeId, type JudgeInput } from "@/lib/scoring";
 import type { ScanSource } from "@/lib/kiosk/types";
@@ -102,6 +102,8 @@ export async function processScan(data: Buffer, mimeType: string, opts: ProcessO
   }
   const geminiVerdict: GeminiVerdict | null = geminiOutcome.status === "fulfilled" ? geminiOutcome.value : null;
   if (geminiVerdict && gemini) judges.push(geminiJudgeInput(geminiVerdict, gemini.model));
+  // Both judges' eyes count: pieces Gemini saw that GPT left out (a shirt under a sweater, a tie) join the item list.
+  if (geminiVerdict && gptOutcome.status === "fulfilled") analysis = { ...analysis, items: mergeJudgeItems(analysis.items, geminiItems(geminiVerdict)) };
 
   const cutoffs: Partial<Record<JudgeId, number>> = {};
   for (const j of judges) cutoffs[j.judge] = adaptiveCutoff(await store.specialnessToday(j.judge).catch(() => []));

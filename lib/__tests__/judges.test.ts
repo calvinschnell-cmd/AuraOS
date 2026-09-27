@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnalysisError, MockProvider, type ImageInput } from "@/lib/analyze";
 import { pickFixture } from "@/lib/fixtures";
-import { MockGeminiJudge, analysisFromGemini, geminiVerdictSchema } from "@/lib/judges/gemini";
+import { MockGeminiJudge, analysisFromGemini, geminiItems, geminiVerdictSchema, mergeJudgeItems } from "@/lib/judges/gemini";
+import type { Item } from "@/lib/schema";
 import { processScan } from "@/lib/server/processScan";
 
 /** Full MOCK MODE: MockProvider (GPT) + MockGeminiJudge, in-memory store. */
@@ -41,7 +42,8 @@ describe("dual-judge pipeline", () => {
     vi.spyOn(MockProvider.prototype, "analyze").mockRejectedValue(new AnalysisError("overheated", "gpt down"));
     const { scan } = await processScan(photo(), "image/jpeg");
     expect(scan.breakdown.judges.map((j) => j.judge)).toEqual(["gemini"]);
-    expect(scan.analysis.items).toEqual([]);
+    // Gemini lists what it sees too, so a Gemini-only scan still has the outfit's pieces.
+    expect(scan.analysis.items.length).toBeGreaterThan(0);
     expect(scan.analysis.modifiers.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -61,9 +63,36 @@ describe("dual-judge pipeline", () => {
   });
 
   it("builds a valid analysis from Gemini alone", () => {
-    const v = { is_outfit_photo: true, specialness: 91, sentiment: "positive" as const, verdict: "Clean.", nickname: "N", style: "streetwear" as const, modifiers: [{ emoji: "🔥", label: "Tuff", tier: "major" as const }] };
+    const v = { is_outfit_photo: true, specialness: 91, sentiment: "positive" as const, verdict: "Clean.", nickname: "N", style: "streetwear" as const, modifiers: [{ emoji: "🔥", label: "Tuff", tier: "major" as const }], items: [] };
     const a = analysisFromGemini(v, null);
     expect(a.modifiers).toHaveLength(3);
     expect(a.style_mix).toEqual([{ style: "streetwear", percent: 100 }]);
+  });
+
+  describe("both judges see the outfit", () => {
+    const item = (name: string, category: Item["category"]): Item => ({ name, category, color: "x", estimated_price_usd: 40, uniqueness: 30, is_statement_piece: false, box_2d: [100, 100, 500, 500] });
+    const gpt = [item("tan half-zip sweater", "top"), item("black dress pants", "bottom"), item("brown shoes", "shoes")];
+
+    it("adds what Gemini saw and GPT missed: the shirt under the sweater and the tie", () => {
+      const gemini = [item("white oxford shirt", "top"), item("burgundy tie", "accessory"), item("beige quarter-zip sweater", "top")];
+      const merged = mergeJudgeItems(gpt, gemini).map((i) => i.name);
+      expect(merged).toEqual(["tan half-zip sweater", "black dress pants", "brown shoes", "white oxford shirt", "burgundy tie"]);
+    });
+
+    it("never doubles pants or shoes, and matches pieces named differently", () => {
+      const gemini = [item("black corduroy trousers", "bottom"), item("brown penny loafers", "shoes"), item("camel knit pullover", "top")];
+      expect(mergeJudgeItems(gpt, gemini)).toHaveLength(3);
+      // With no shoes from GPT, Gemini's loafers are added.
+      expect(mergeJudgeItems(gpt.slice(0, 2), gemini).map((i) => i.name)).toContain("brown penny loafers");
+    });
+
+    it("drops a malformed Gemini item instead of the whole verdict", () => {
+      const raw = { is_outfit_photo: true, specialness: 70, sentiment: "positive", verdict: "Crisp.", nickname: "Prep", style: "old money", modifiers: [{ emoji: "👔", label: "Tie", tier: "major" }], items: [item("burgundy tie", "accessory"), { name: "mystery", category: "cape", box_2d: [1] }] };
+      const v = geminiVerdictSchema.parse(raw);
+      expect(geminiItems(v).map((i) => i.name)).toEqual(["burgundy tie"]);
+      // Older replies without items still parse.
+      expect(geminiVerdictSchema.parse({ ...raw, items: undefined }).items).toEqual([]);
+      expect(analysisFromGemini(v, null).items.map((i) => i.name)).toEqual(["burgundy tie"]);
+    });
   });
 });
