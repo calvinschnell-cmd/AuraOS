@@ -488,7 +488,9 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
                 </button>
               ))}
             </div>
-            <div className="op-note">{sent ?? "SENDS STRAIGHT TO THE MIRROR."}</div>
+            <div key={sent ?? ""} className={`op-note ${sent ? "op-note--flash" : ""}`}>
+              {sent ?? "SENDS STRAIGHT TO THE MIRROR."}
+            </div>
           </Win>
           <Win title="CAMERA.EXE">
             <CameraPanel adminKey={key} status={liveStatus} now={now} />

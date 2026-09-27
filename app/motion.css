@@ -1,0 +1,142 @@
+/* ================================================================ motion (admin, launcher, /tv, card pages, kiosk QR windows)
+ * Minimal and stepped, like the kiosk and phone app: windows wipe in top-down,
+ * rows rise in once when they first mount (lists keep their keys, so only new
+ * rows move), buttons nudge when pressed. Fill mode is `backwards` so nothing
+ * keeps a transform or clip-path afterwards (either would trap fixed overlays
+ * like the full-screen judges QR). Everything is off under reduced motion. */
+
+@keyframes fx-wipe {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes fx-rise {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+}
+@keyframes fx-flash {
+  from {
+    background: color-mix(in srgb, var(--aura-cyan) 28%, transparent);
+  }
+}
+
+/* ---- shared helpers (used on the launcher) */
+.fx-wipe {
+  animation: fx-wipe 260ms steps(5) backwards;
+}
+.fx-rise {
+  animation: fx-rise 240ms steps(3) backwards;
+  animation-delay: calc(180ms + var(--i, 0) * 45ms);
+}
+.fx-nudge > :first-child {
+  display: inline-block;
+  transition: transform 90ms steps(2);
+}
+.fx-nudge:hover > :first-child,
+.fx-nudge:focus-visible > :first-child {
+  transform: translateX(4px);
+}
+
+/* ---- /admin: windows wipe in column by column, new rows rise, buttons press */
+.op__col > :nth-child(2) {
+  --i: 1;
+}
+.op__col > :nth-child(3) {
+  --i: 2;
+}
+.op__col > :nth-child(4) {
+  --i: 3;
+}
+.op__col > :nth-child(5) {
+  --i: 4;
+}
+.op__col > :nth-child(n + 6) {
+  --i: 5;
+}
+.op__col:nth-child(2) {
+  --c: 1;
+}
+.op__col:nth-child(3) {
+  --c: 2;
+}
+.op-win {
+  animation: fx-wipe 260ms steps(5) backwards;
+  animation-delay: calc((var(--i, 0) + var(--c, 0)) * 60ms);
+}
+.op-queue__row,
+.op-board__row,
+.op-card,
+.op-row {
+  animation: fx-rise 220ms steps(3) backwards;
+}
+.op-btn {
+  transition: transform 80ms steps(1);
+}
+.op-btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+}
+.op-note--flash {
+  animation: fx-flash 700ms steps(4) backwards;
+}
+.op-qr-full {
+  animation: os-open 180ms steps(5) backwards;
+  transform-origin: center;
+}
+
+/* ---- /tv: the board rises in row by row (again whenever the king changes) */
+.lb__entry {
+  animation: fx-rise 240ms steps(3) backwards;
+}
+.lb__entry:nth-child(2) {
+  animation-delay: 40ms;
+}
+.lb__entry:nth-child(3) {
+  animation-delay: 80ms;
+}
+.lb__entry:nth-child(4) {
+  animation-delay: 120ms;
+}
+.lb__entry:nth-child(5) {
+  animation-delay: 160ms;
+}
+.lb__entry:nth-child(n + 6) {
+  animation-delay: 200ms;
+}
+
+/* ---- /card/[id]: the card window wipes in */
+.card-page__window {
+  animation: fx-wipe 300ms steps(6) backwards;
+}
+
+/* ---- kiosk: the phone and claim QR windows wipe in once (they stay still after) */
+.phone-scan-window,
+.claim-window {
+  animation: fx-wipe 300ms steps(6) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-wipe,
+  .fx-rise,
+  .op-win,
+  .op-queue__row,
+  .op-board__row,
+  .op-card,
+  .op-row,
+  .op-note--flash,
+  .op-qr-full,
+  .lb__entry,
+  .card-page__window,
+  .phone-scan-window,
+  .claim-window {
+    animation: none !important;
+  }
+  .fx-nudge > :first-child,
+  .op-btn {
+    transition: none;
+  }
+}

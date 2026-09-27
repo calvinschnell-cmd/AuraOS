@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { APP_VERSION } from "@/lib/config";
 import { FOOTER_LINES } from "@/lib/copy";
 
@@ -26,17 +27,17 @@ export default function Home() {
         </p>
       </header>
 
-      <section className="w-full max-w-md border border-aura-cyan bg-aura-black">
+      <section className="fx-wipe w-full max-w-md border border-aura-cyan bg-aura-black">
         <div className="flex items-center justify-between border-b border-aura-cyan bg-aura-cyan px-2 py-1 font-heading text-[10px] uppercase text-aura-ink">
           <span>LAUNCHER.EXE</span>
           <span aria-hidden>x</span>
         </div>
         <ul className="divide-y divide-aura-cyan/30">
-          {ROUTES.map((r) => (
-            <li key={r.href}>
+          {ROUTES.map((r, i) => (
+            <li key={r.href} className="fx-rise" style={{ "--i": i } as CSSProperties}>
               <Link
                 href={r.href}
-                className="flex items-baseline justify-between gap-4 px-3 py-2 font-heading text-xs uppercase text-aura-cyan hover:bg-aura-cyan hover:text-aura-ink"
+                className="fx-nudge flex items-baseline justify-between gap-4 px-3 py-2 font-heading text-xs uppercase text-aura-cyan hover:bg-aura-cyan hover:text-aura-ink"
               >
                 <span>&gt; {r.label}</span>
                 <span className="font-mono text-[10px] normal-case opacity-70">
