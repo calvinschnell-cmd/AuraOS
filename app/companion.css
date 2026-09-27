@@ -1050,3 +1050,44 @@ a.standings__row:active {
   gap: 0.2rem;
   font-size: 0.65rem;
 }
+
+/* /leaderboard (phone): you, source markers */
+.standings__row--you {
+  outline: 2px solid var(--aura-glow);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--aura-cyan) 18%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--aura-cyan) 45%, transparent);
+}
+.standings__you {
+  margin-right: 0.4rem;
+  padding: 0 0.3rem;
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}
+.standings__gap {
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+.source-mark {
+  font-size: 0.7rem;
+}
+.board-you {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--aura-glow);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+.board-you .font-number {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.board-you--cta {
+  background: var(--aura-cyan);
+  color: var(--aura-ink);
+}

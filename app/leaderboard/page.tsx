@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { LeaderboardScreen } from "@/components/leaderboard/LeaderboardScreen";
-import { publicBaseUrlForHost } from "@/lib/server/baseUrl";
+import { BoardScreen } from "@/components/companion/BoardScreen";
 
-export const metadata: Metadata = { title: "AURA OS // TIDE CHART" };
+export const metadata: Metadata = {
+  title: "AURA OS · LEADERBOARD",
+  description: "Live AURA OS rankings from the mirror and phones at HackGT 13.",
+  openGraph: { title: "AURA OS · LEADERBOARD", images: [{ url: "/api/og?t=LIVE LEADERBOARD", width: 1200, height: 630 }] },
+  twitter: { card: "summary_large_image", title: "AURA OS · LEADERBOARD", images: ["/api/og?t=LIVE LEADERBOARD"] },
+};
 
-export default async function LeaderboardPage() {
-  // The follow-along QR must open on a phone, even when this display is at localhost.
-  const h = await headers();
-  return <LeaderboardScreen publicBaseUrl={publicBaseUrlForHost(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto") ?? "http")} />;
+/** Phone leaderboard (the big-screen Tide Chart lives at /tv). */
+export default function LeaderboardPage() {
+  return <BoardScreen />;
 }

@@ -6,7 +6,8 @@ const ROUTES: { href: string; label: string; note: string }[] = [
   { href: "/kiosk?mode=digital", label: "KIOSK (DIGITAL)", note: "flipped camera feed" },
   { href: "/kiosk?mode=mirror", label: "KIOSK (MIRROR)", note: "two-way mirror, pure black" },
   { href: "/feed", label: "FEED", note: "companion app: every card, reactions" },
-  { href: "/leaderboard", label: "LEADERBOARD", note: "tide chart, rivalries, squad champion" },
+  { href: "/tv", label: "TIDE CHART (TV)", note: "big-screen board, rivalries, squad champion" },
+  { href: "/scan", label: "PHONE APP", note: "scan, leaderboard, feed, challenges" },
   { href: "/admin", label: "ADMIN", note: "mirror, controls, feed, board edits, ADMIN_KEY" },
 ];
 

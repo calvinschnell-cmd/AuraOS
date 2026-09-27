@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /** Screens people watch from across the room: the link only shows while the mouse moves. */
-const AUTO_HIDE = ["/kiosk", "/leaderboard"];
+const AUTO_HIDE = ["/kiosk", "/tv"];
 /** No floating link: the print page, and the phone app (its tab bar has HOME). */
-const NONE = ["/certificate", "/feed", "/r/", "/u/", "/me", "/scan", "/c/"];
+const NONE = ["/certificate", "/feed", "/r/", "/u/", "/me", "/scan", "/c/", "/leaderboard"];
 const IDLE_MS = 2_500;
 
 /** Back to the launcher (/) from every page. */

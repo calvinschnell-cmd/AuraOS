@@ -313,6 +313,8 @@ export interface LeaderboardSnapshot {
   /** Rivalry of the Day, Squad Champion, streaks, most improved (rule-based). */
   narrative: LeaderboardNarrative;
   at: number;
+  /** The viewer's own best entry and rank (phones send their device id / AURA ID); null when they have none. */
+  you?: { entry: LeaderboardEntry; rank: number } | null;
 }
 
 /** JSON body returned by POST /api/scan/quick (phone scans). */

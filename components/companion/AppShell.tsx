@@ -72,7 +72,7 @@ export function AppShell({
   const items: { tab: AppTab; label: string; href: string }[] = [
     { tab: "scan", label: "SCAN", href: "/scan" },
     { tab: "feed", label: "FEED", href: "/feed" },
-    { tab: "board", label: "BOARD", href: "/feed?tab=standings" },
+    { tab: "board", label: "BOARD", href: "/leaderboard" },
     { tab: "me", label: player ? "ME" : "JOIN", href: player ? historyPath(player.handle) : "/me" },
   ];
   const index = active ? items.findIndex((i) => i.tab === active) : -1;

@@ -449,7 +449,7 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
           <a href="/feed" target="_blank" rel="noreferrer">
             PHONE FEED ↗
           </a>
-          <a href="/leaderboard" target="_blank" rel="noreferrer">
+          <a href="/tv" target="_blank" rel="noreferrer">
             BIG SCREEN ↗
           </a>
           <a href="/pose-lab" target="_blank" rel="noreferrer">

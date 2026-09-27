@@ -19,7 +19,7 @@ export function LeaderboardScreen({ publicBaseUrl = null }: { publicBaseUrl?: st
   const [qr, setQr] = useState<string | null>(null);
   useEffect(() => {
     // Phones open the live standings (tap a row for that card), not this big-screen page.
-    makeQrDataUrl(`${publicBaseUrl ?? window.location.origin}/feed?tab=standings`, 480).then(setQr).catch(() => setQr(null));
+    makeQrDataUrl(`${publicBaseUrl ?? window.location.origin}/leaderboard`, 480).then(setQr).catch(() => setQr(null));
   }, [publicBaseUrl]);
 
   const top = snapshot?.top ?? [];
