@@ -1,10 +1,10 @@
 import { auraMagnitude, formatAura, judgeName, type ScoreBreakdown } from "@/lib/scoring";
 
 /**
- * The two judges' verdicts side by side, named only JUDGE 1 / JUDGE 2 (the
- * models behind them are never shown or spoken). When they land far
- * apart, the "JUDGES DISAGREE" banner is the reveal's payoff moment. With a
- * single judge, just its verdict.
+ * The judges that answered (two or three) side by side, named only JUDGE 1 /
+ * JUDGE 2 / JUDGE 3 (the models behind them are never shown or spoken). When
+ * they land far apart, the "JUDGES DISAGREE" banner is the reveal's payoff
+ * moment. With a single judge, just its verdict.
  */
 export function JudgesPanel({ breakdown, verdict }: { breakdown: ScoreBreakdown; verdict: string }) {
   const judges = breakdown.judges ?? [];
@@ -24,7 +24,7 @@ export function JudgesPanel({ breakdown, verdict }: { breakdown: ScoreBreakdown;
       ) : (
         <div className="judges__agree">THE JUDGES AGREE</div>
       )}
-      <div className="judges__grid">
+      <div className={`judges__grid judges__grid--${judges.length}`}>
         {judges.map((j, i) => (
           <div key={j.judge} className={`judge judge--${j.judge}`}>
             <div className="judge__name">{judgeName(i)}</div>

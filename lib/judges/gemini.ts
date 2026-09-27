@@ -122,8 +122,9 @@ export function mergeJudgeItems(gpt: readonly Item[], gemini: readonly Item[]): 
   return out;
 }
 
-export function geminiJudgeInput(v: GeminiVerdict, model: string): JudgeInput {
-  return { judge: "gemini", model, specialness: v.specialness, sentiment: v.sentiment, verdict: v.verdict, nickname: v.nickname.slice(0, 30) };
+/** A second or third judge's rating for scoreScan (Gemini by default; Claude answers in the same shape). */
+export function geminiJudgeInput(v: GeminiVerdict, model: string, judge: JudgeInput["judge"] = "gemini"): JudgeInput {
+  return { judge, model, specialness: v.specialness, sentiment: v.sentiment, verdict: v.verdict, nickname: v.nickname.slice(0, 30) };
 }
 
 export class GeminiJudge implements Judge {

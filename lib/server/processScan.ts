@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { AnalysisError, getAnalysisProvider, type AnalysisResult } from "@/lib/analyze";
 import { DAILY_SCAN_CAP } from "@/lib/config";
-import { analysisFromGemini, geminiItems, geminiJudgeInput, getGeminiJudge, mergeJudgeItems, type GeminiVerdict } from "@/lib/judges/gemini";
+import { getClaudeJudge } from "@/lib/judges/claude";
+import { analysisFromGemini, geminiItems, geminiJudgeInput, getGeminiJudge, mergeJudgeItems, type GeminiVerdict, type Judge } from "@/lib/judges/gemini";
 import type { Analysis } from "@/lib/schema";
 import { adaptiveCutoff, gptJudge, scoreScan, type JudgeId, type JudgeInput } from "@/lib/scoring";
 import type { ScanSource } from "@/lib/kiosk/types";
@@ -76,15 +77,18 @@ export async function processScan(data: Buffer, mimeType: string, opts: ProcessO
   }
 
   const image = { data, mimeType, hash };
-  // Stage 1 once, shared by both judges (mock mode never calls the sidecar).
+  // Stage 1 once, shared by every judge (mock mode never calls the sidecar).
   const classified = provider.name === "openai" ? await classifyGarments(data, mimeType) : null;
   const seg = classified?.seg ?? null;
   const gemini = opts.singleJudge ? null : getGeminiJudge();
-  const [gptOutcome, geminiOutcome] = await Promise.allSettled([
+  const claude = opts.singleJudge ? null : getClaudeJudge();
+  const [gptOutcome, geminiOutcome, claudeOutcome] = await Promise.allSettled([
     provider.analyze(image, { seg }),
     gemini ? gemini.judge(image, seg) : Promise.reject(new Error("no second judge")),
+    claude ? claude.judge(image, seg) : Promise.reject(new Error("no third judge")),
   ]);
-  if (geminiOutcome.status === "rejected" && gemini) console.warn("[aura] gemini judge failed, GPT judges alone:", String(geminiOutcome.reason));
+  if (geminiOutcome.status === "rejected" && gemini) console.warn("[aura] gemini judge failed, scoring without it:", String(geminiOutcome.reason));
+  if (claudeOutcome.status === "rejected" && claude) console.warn("[aura] claude judge failed, scoring without it:", String(claudeOutcome.reason));
 
   let result: AnalysisResult | null = null;
   let analysis: Analysis;
@@ -95,15 +99,25 @@ export async function processScan(data: Buffer, mimeType: string, opts: ProcessO
     analysis = result.analysis;
     judges.push(gptJudge(analysis, provider.model));
   } else if (geminiOutcome.status === "fulfilled") {
-    console.warn("[aura] GPT judge failed, Gemini judges alone:", gptOutcome.reason);
+    console.warn("[aura] GPT judge failed, the analysis comes from Gemini:", gptOutcome.reason);
     analysis = analysisFromGemini(geminiOutcome.value, seg);
+  } else if (claudeOutcome.status === "fulfilled") {
+    console.warn("[aura] GPT and Gemini failed, the analysis comes from Claude:", gptOutcome.reason);
+    analysis = analysisFromGemini(claudeOutcome.value, seg);
   } else {
     throw gptOutcome.reason instanceof AnalysisError ? gptOutcome.reason : new AnalysisError("overheated", String(gptOutcome.reason), gptOutcome.reason);
   }
-  const geminiVerdict: GeminiVerdict | null = geminiOutcome.status === "fulfilled" ? geminiOutcome.value : null;
-  if (geminiVerdict && gemini) judges.push(geminiJudgeInput(geminiVerdict, gemini.model));
-  // Both judges' eyes count: pieces Gemini saw that GPT left out (a shirt under a sweater, a tie) join the item list.
-  if (geminiVerdict && gptOutcome.status === "fulfilled") analysis = { ...analysis, items: mergeJudgeItems(analysis.items, geminiItems(geminiVerdict)) };
+  // Only the judges that answered are scored (and shown); every judge's eyes count:
+  // pieces one saw that the analysis left out (a shirt under a sweater, a tie) join the item list.
+  const extra: { verdict: GeminiVerdict | null; judge: Judge | null; id: JudgeId }[] = [
+    { verdict: geminiOutcome.status === "fulfilled" ? geminiOutcome.value : null, judge: gemini, id: "gemini" },
+    { verdict: claudeOutcome.status === "fulfilled" ? claudeOutcome.value : null, judge: claude, id: "claude" },
+  ];
+  for (const { verdict, judge, id } of extra) {
+    if (!verdict || !judge) continue;
+    judges.push(geminiJudgeInput(verdict, judge.model, id));
+    analysis = { ...analysis, items: mergeJudgeItems(analysis.items, geminiItems(verdict)) };
+  }
 
   const cutoffs: Partial<Record<JudgeId, number>> = {};
   for (const j of judges) cutoffs[j.judge] = adaptiveCutoff(await store.specialnessToday(j.judge).catch(() => []));

@@ -110,6 +110,9 @@ describe("two judges", () => {
   it("calls out a disagreement only when it is significant", () => {
     expect(judgesDisagree([{ aura: 400_000 }, { aura: 50_000 }])).toBe(true); // far apart
     expect(judgesDisagree([{ aura: 120_000 }, { aura: -80_000 }])).toBe(true); // opposite ways, meaningful gap
+    // Three judges: the two furthest apart decide.
+    expect(judgesDisagree([{ aura: 100_000 }, { aura: 120_000 }, { aura: 500_000 }])).toBe(true);
+    expect(judgesDisagree([{ aura: 100_000 }, { aura: 120_000 }, { aura: 130_000 }])).toBe(false);
     expect(judgesDisagree([{ aura: 5_000 }, { aura: -3_000 }])).toBe(false); // both basically zero
     expect(judgesDisagree([{ aura: 600_000 }, { aura: 450_000 }])).toBe(false); // both huge, same way
     expect(judgesDisagree([{ aura: 900_000 }])).toBe(false);

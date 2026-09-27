@@ -22,6 +22,15 @@ export const GEMINI_MODEL: string = process.env.GEMINI_MODEL?.trim() || DEFAULT_
 export const GEMINI_TIMEOUT_MS = 10_000;
 
 /**
+ * Claude, the third judge (parallel to GPT and Gemini). Override with
+ * CLAUDE_MODEL. Only used when ANTHROPIC_API_KEY is set.
+ */
+export const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
+export const CLAUDE_MODEL: string = process.env.CLAUDE_MODEL?.trim() || DEFAULT_CLAUDE_MODEL;
+/** The third judge never holds up a scan longer than this (no retries). */
+export const CLAUDE_TIMEOUT_MS = 12_000;
+
+/**
  * ElevenLabs voice for verdicts and roasts (browser voice otherwise).
  * Default: "Liam" from ElevenLabs' stock library; override with ELEVENLABS_VOICE_ID.
  */

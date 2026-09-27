@@ -14,7 +14,7 @@ import type { Analysis, ModifierTier } from "@/lib/schema";
  * when they land far apart the reveal calls out "judges disagree".
  */
 
-export type JudgeId = "gpt" | "gemini";
+export type JudgeId = "gpt" | "gemini" | "claude";
 export type Sentiment = "positive" | "negative";
 
 export interface JudgeInput {
@@ -133,9 +133,12 @@ export function adaptiveCutoff(todayRatings: readonly number[]): number {
 
 export function judgesDisagree(judges: readonly Pick<JudgeScore, "aura">[]): boolean {
   if (judges.length < 2) return false;
-  const [a, b] = judges;
-  const gap = Math.abs(a.aura - b.aura);
-  return gap >= DISAGREE_GAP || (Math.sign(a.aura) !== Math.sign(b.aura) && gap >= OPPOSITE_MIN_GAP);
+  // The two furthest apart decide (with two judges: those two).
+  const auras = judges.map((j) => j.aura);
+  const a = Math.max(...auras);
+  const b = Math.min(...auras);
+  const gap = a - b;
+  return gap >= DISAGREE_GAP || (Math.sign(a) !== Math.sign(b) && gap >= OPPOSITE_MIN_GAP);
 }
 
 /**

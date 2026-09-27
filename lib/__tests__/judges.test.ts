@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnalysisError, MockProvider, type ImageInput } from "@/lib/analyze";
 import { pickFixture } from "@/lib/fixtures";
+import Anthropic from "@anthropic-ai/sdk";
+import { ClaudeJudge } from "@/lib/judges/claude";
 import { MockGeminiJudge, analysisFromGemini, geminiItems, geminiVerdictSchema, mergeJudgeItems } from "@/lib/judges/gemini";
 import type { Item } from "@/lib/schema";
 import { processScan } from "@/lib/server/processScan";
@@ -9,6 +11,7 @@ import { processScan } from "@/lib/server/processScan";
 beforeEach(() => {
   delete process.env.OPENAI_API_KEY;
   delete process.env.GEMINI_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
   // Skip the mock provider's artificial delay.
   vi.spyOn(MockProvider.prototype, "analyze").mockImplementation(async (image: ImageInput) => ({
     analysis: pickFixture(image.hash),
@@ -93,6 +96,45 @@ describe("dual-judge pipeline", () => {
       // Older replies without items still parse.
       expect(geminiVerdictSchema.parse({ ...raw, items: undefined }).items).toEqual([]);
       expect(analysisFromGemini(v, null).items.map((i) => i.name)).toEqual(["burgundy tie"]);
+    });
+  });
+  describe("Claude as the third judge", () => {
+    const tie = { name: "burgundy tie", category: "accessory", color: "burgundy", estimated_price_usd: 30, uniqueness: 60, is_statement_piece: false, box_2d: [300, 450, 520, 520] };
+    const verdict = { is_outfit_photo: true, specialness: 88, sentiment: "positive" as const, verdict: "Tie under a quarter-zip, respect.", nickname: "Prep With A Tie", style: "old money" as const, modifiers: [{ emoji: "👔", label: "Tie layered right", tier: "major" as const }], items: [tie] };
+
+    it("joins GPT and Gemini, is averaged in, and adds the pieces it saw", async () => {
+      process.env.ANTHROPIC_API_KEY = "test-key";
+      vi.spyOn(ClaudeJudge.prototype, "judge").mockResolvedValue(verdict);
+      const { scan } = await processScan(photo(), "image/jpeg");
+      const judges = scan.breakdown.judges;
+      expect(judges.map((j) => j.judge)).toEqual(["gpt", "gemini", "claude"]);
+      expect(scan.aura).toBe(Math.round(judges.reduce((s, j) => s + j.aura, 0) / 3));
+      expect(scan.analysis.items.map((i) => i.name)).toContain("burgundy tie");
+    });
+
+    it("is left out when it fails: only the judges that answered are scored and shown", async () => {
+      process.env.ANTHROPIC_API_KEY = "test-key";
+      vi.spyOn(ClaudeJudge.prototype, "judge").mockRejectedValue(new Error("timeout"));
+      const { scan } = await processScan(photo(), "image/jpeg");
+      expect(scan.breakdown.judges.map((j) => j.judge)).toEqual(["gpt", "gemini"]);
+    });
+
+    it("is off without a key", async () => {
+      const spy = vi.spyOn(ClaudeJudge.prototype, "judge");
+      const { scan } = await processScan(photo(), "image/jpeg");
+      expect(spy).not.toHaveBeenCalled();
+      expect(scan.breakdown.judges.map((j) => j.judge)).not.toContain("claude");
+    });
+
+    it("parses Claude's structured reply, clamps the rating and rejects a refusal", async () => {
+      const messages = Object.getPrototypeOf(new Anthropic({ apiKey: "x" }).beta.messages) as { parse: (...args: unknown[]) => Promise<unknown> };
+      const image = { data: Buffer.from("img"), mimeType: "image/jpeg", hash: "h-claude" };
+      vi.spyOn(messages, "parse").mockResolvedValue({ stop_reason: "end_turn", stop_details: null, parsed_output: { ...verdict, specialness: 130 }, usage: { input_tokens: 10, output_tokens: 20 } });
+      const v = await new ClaudeJudge("test-key").judge(image, null);
+      expect(v.specialness).toBe(100);
+      expect(geminiItems(v).map((i) => i.name)).toEqual(["burgundy tie"]);
+      vi.spyOn(messages, "parse").mockResolvedValue({ stop_reason: "refusal", stop_details: { category: null }, parsed_output: null, usage: { input_tokens: 10, output_tokens: 0 } });
+      await expect(new ClaudeJudge("test-key").judge(image, null)).rejects.toThrow(/declined/);
     });
   });
 });
