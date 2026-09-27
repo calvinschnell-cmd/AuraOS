@@ -10,6 +10,7 @@ export function TopBar({
   onToggleMode,
   fullscreen,
   onToggleFullscreen,
+  onReset,
 }: {
   scansToday: number;
   mode: KioskMode;
@@ -17,6 +18,8 @@ export function TopBar({
   onToggleMode: () => void;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
+  /** Ends the session: the quick "SESSION CLOSED. REBOOTING" terminal, then back to spinning. */
+  onReset: () => void;
 }) {
   const [clock, setClock] = useState("");
   useEffect(() => {
@@ -48,6 +51,9 @@ export function TopBar({
           {live ? "LIVE" : "OFFLINE"}
         </span>
         <span className="tabular-nums">{clock}</span>
+        <button type="button" className="top-bar__button" onClick={onReset} title="End the session (quick reboot)">
+          [RESET]
+        </button>
       </div>
     </header>
   );

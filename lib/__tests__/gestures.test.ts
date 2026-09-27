@@ -4,6 +4,8 @@ import { gesturesForState } from "@/lib/kiosk/machine";
 
 const IDLE = allowedGestures(gesturesForState("SPINNING"), true);
 const RESULT = allowedGestures(gesturesForState("RESULT"), false);
+/** The kiosk no longer takes the open palm on any screen (the session ends from [RESET]); the engine still supports it. */
+const PALM = new Set<EngineGesture>([...RESULT, "open_palm"]);
 /** Greeting: only the scan / battle signs count (a thumbs up there does nothing). */
 const GREETING = allowedGestures(gesturesForState("GREETING"), false);
 
@@ -99,12 +101,12 @@ describe("gesture engine", () => {
 
   it("open palm (end session) needs a deliberate 1.5s hold and is not bridged", () => {
     const e = new GestureEngine();
-    expect(hold(e, [hand("Open_Palm", 0.5)], 1300, RESULT)).toEqual([]);
-    expect(hold(e, [hand("Open_Palm", 0.5)], 300, RESULT, 1366)).toEqual([{ type: "open_palm" }]);
+    expect(hold(e, [hand("Open_Palm", 0.5)], 1300, PALM)).toEqual([]);
+    expect(hold(e, [hand("Open_Palm", 0.5)], 300, PALM, 1366)).toEqual([{ type: "open_palm" }]);
     // Relaxed hands / waves that read as Open_Palm on and off never end the session.
     const e2 = new GestureEngine();
     const events: GestureEvent[] = [];
-    for (let i = 0, t = 0; t <= 5000; i++, t += 66) events.push(...e2.update(frame(t, i % 2 === 0 ? [hand("Open_Palm", 0.5)] : []), RESULT));
+    for (let i = 0, t = 0; t <= 5000; i++, t += 66) events.push(...e2.update(frame(t, i % 2 === 0 ? [hand("Open_Palm", 0.5)] : []), PALM));
     expect(events).toEqual([]);
   });
 
@@ -115,7 +117,7 @@ describe("gesture engine", () => {
       const events: GestureEvent[] = [];
       for (let t = 0; t <= 2000; t += 66) {
         events.push(
-          ...e.update({ t, hands: [{ ...hand("Open_Palm", 0.5), wristY }], poses: [{ wrists: [{ x: 0.5, y: wristY }], shoulderY: 0.3, hipY: 0.7 }], mirrored: true }, RESULT),
+          ...e.update({ t, hands: [{ ...hand("Open_Palm", 0.5), wristY }], poses: [{ wrists: [{ x: 0.5, y: wristY }], shoulderY: 0.3, hipY: 0.7 }], mirrored: true }, PALM),
         );
       }
       return events;

@@ -19,8 +19,8 @@ export const VOICE_PROMPTS = {
   strikePose: ["Hands down. Strike a pose.", "Aight, hands down and hit your best pose.", "Drop the hands. Pose for me."],
   /** After the verdict. */
   resultActions: [
-    "Thumbs up to get on the board, thumbs down if you want it worse, palm to dip.",
-    "Thumbs up to lock it in. Thumbs down for another roast. Palm when you're done.",
+    "Thumbs up to get on the board, thumbs down if you want it worse.",
+    "Thumbs up to lock it in. Thumbs down for another roast.",
     "Want it on the leaderboard? Thumbs up. Want me to go harder? Thumbs down.",
   ],
   nameEntry: ["Type your name in, let's make it official.", "Put your name on it for the leaderboard."],

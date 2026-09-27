@@ -70,6 +70,7 @@ export function DigitalLayout(p: KioskViewProps) {
             onToggleMode={p.toggleMode}
             fullscreen={p.fullscreen}
             onToggleFullscreen={p.toggleFullscreen}
+            onReset={p.reboot}
           />
 
           <main className="kiosk-main">
