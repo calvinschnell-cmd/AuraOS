@@ -382,9 +382,11 @@ export function useGestures(opts: GestureOptions): GestureRuntime {
       if (personSeen) lastPersonAt.current = Date.now();
 
       // Which gestures may fire right now.
-      const ignore = gesturesIgnored(o.state) || o.revealing || Date.now() < cooldownUntil.current;
+      const ignore = gesturesIgnored(o.state) || Date.now() < cooldownUntil.current;
       const battleAllowed = isIdleState(o.state) || o.state === "READY" || o.state === "LOBBY";
-      const allowed: Set<EngineGesture> = ignore ? new Set() : allowedGestures(gesturesForState(o.state), battleAllowed);
+      // While a result is being revealed only the open palm (end session) still works.
+      const stateList = gesturesForState(o.state);
+      const allowed: Set<EngineGesture> = ignore ? new Set() : allowedGestures(o.revealing ? stateList.filter((g) => g === "open_palm") : stateList, battleAllowed);
       // Scans only judge a whole fit at a readable size: with no body in view
       // at all, hold the scan gestures. Per-person framing is checked in the
       // engine (every battler must be framed too).

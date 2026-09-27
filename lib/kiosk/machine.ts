@@ -30,6 +30,8 @@ function modeSelect(event: KioskEvent): KioskState | null {
  */
 export function transition(state: KioskState, event: KioskEvent, ctx: TransitionContext = {}): KioskState | null {
   if (event.type === "RESET") return state === "BOOT" ? null : "SPINNING";
+  // Open palm, anywhere: the quick "SESSION CLOSED. REBOOTING" terminal, then back to spinning.
+  if (event.type === "OPEN_PALM") return palmReboots(state) ? "BOOT" : null;
 
   switch (state) {
     case "BOOT":
@@ -133,8 +135,6 @@ export function transition(state: KioskState, event: KioskEvent, ctx: Transition
         case "THUMB_DOWN":
         case "ROAST_READY":
           return "RESULT"; // extra roast, score unchanged
-        case "OPEN_PALM":
-          return "BOOT"; // quick reboot, then back to spinning
         case "TIMEOUT":
           return "SPINNING";
         default:
@@ -161,8 +161,6 @@ export function transition(state: KioskState, event: KioskEvent, ctx: Transition
         case "BADGE":
         case "COMMENTARY":
           return "CLAIM";
-        case "OPEN_PALM":
-          return "BOOT";
         case "TIMEOUT":
           return "SPINNING";
         default:
@@ -179,8 +177,6 @@ export function transition(state: KioskState, event: KioskEvent, ctx: Transition
         case "SLOT_SCORED":
         case "SLOT_FAILED":
           return "LOBBY";
-        case "OPEN_PALM":
-          return "BOOT";
         case "TIMEOUT":
           // A squad that waited long enough just starts; a lonely duel ends.
           return ctx.lobbyCanStart ? "BATTLE_INTRO" : "SPINNING";
@@ -222,8 +218,6 @@ export function transition(state: KioskState, event: KioskEvent, ctx: Transition
         case "COMMENTARY":
         case "REVEAL_STEP":
           return "BATTLE_RESULT";
-        case "OPEN_PALM":
-          return "BOOT";
         case "TIMEOUT":
           return "SPINNING";
         default:
@@ -311,12 +305,30 @@ export function legendLabel(gesture: GestureId, state: KioskState): string {
  * gestures still work (gesturesForState).
  */
 export function legendForState(state: KioskState): GestureId[] {
+  if (isIdleState(state)) return ["wave"];
   // After the greeting a wave only gets a (more bored) wave back: it works, but is not advertised.
-  return isIdleState(state) ? ["wave"] : gesturesForState(state).filter((g) => g !== "wave");
+  // Screens where hands are busy (charging, analyzing, typing) do not advertise the palm either.
+  const own = stateGestures(state).filter((g) => g !== "wave");
+  return own.length === 0 ? [] : gesturesForState(state).filter((g) => g !== "wave");
+}
+
+/**
+ * The open palm (raised, held 1.5 s) ends the session from any screen with the
+ * quick reboot, except while a photo is being taken: an open hand is a common
+ * pose, and the countdown must not throw the shot away.
+ */
+export function palmReboots(state: KioskState): boolean {
+  return state !== "BOOT" && state !== "COUNTDOWN" && state !== "LOBBY_COUNTDOWN";
 }
 
 /** Gestures that do something in the given state (drives what the engine allows). */
 export function gesturesForState(state: KioskState): GestureId[] {
+  const own = stateGestures(state);
+  return palmReboots(state) && !own.includes("open_palm") ? [...own, "open_palm"] : own;
+}
+
+/** The gestures a state reacts to besides the always-on open palm. */
+function stateGestures(state: KioskState): GestureId[] {
   switch (state) {
     case "SPINNING":
     case "ATTRACT":
@@ -369,15 +381,11 @@ export function gestureEvent(gesture: EngineGesture, state: KioskState): KioskEv
 }
 
 /** Gestures are ignored while analyzing and during the reveal animation. */
+/**
+ * No gesture at all: booting, and the photo countdowns. (Locking, charging,
+ * analyzing, the battle intro and typing a name only take the open palm:
+ * their own gesture lists are empty.)
+ */
 export function gesturesIgnored(state: KioskState): boolean {
-  return (
-    state === "BOOT" ||
-    state === "LOCKING" ||
-    state === "CHARGING" ||
-    state === "COUNTDOWN" ||
-    state === "ANALYZING" ||
-    state === "LOBBY_COUNTDOWN" ||
-    state === "BATTLE_INTRO" ||
-    state === "NAME_ENTRY" // typing: hands are on the keyboard
-  );
+  return !palmReboots(state);
 }

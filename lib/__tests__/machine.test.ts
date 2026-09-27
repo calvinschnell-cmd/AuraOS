@@ -36,6 +36,17 @@ describe("kiosk state machine", () => {
     expect(legendForState("READY")).toEqual(gesturesForState("READY").filter((g) => g !== "wave"));
   });
 
+  it("open palm does the quick reboot from any screen except boot and the photo countdowns", () => {
+    for (const state of KIOSK_STATES as readonly KioskState[]) {
+      const blocked = state === "BOOT" || state === "COUNTDOWN" || state === "LOBBY_COUNTDOWN";
+      expect(transition(state, { type: "OPEN_PALM" })).toBe(blocked ? null : "BOOT");
+      expect(gesturesForState(state).includes("open_palm")).toBe(!blocked);
+    }
+    // Screens where hands are busy take it but do not advertise it.
+    expect(legendForState("ANALYZING")).toEqual([]);
+    expect(legendForState("RESULT")).toContain("open_palm");
+  });
+
   it("keeps answering waves after the greeting (a wave back, more bored each time)", () => {
     expect(gesturesForState("READY")).toContain("wave");
     expect(legendForState("READY")).not.toContain("wave");
@@ -55,9 +66,9 @@ describe("kiosk state machine", () => {
     expect(transition("NAME_ENTRY", { type: "NAME_SUBMIT", name: null, handle: null })).toBe("CLAIM");
     expect(transition("NAME_ENTRY", { type: "NAME_CANCEL" })).toBe("RESULT");
     expect(transition("NAME_ENTRY", { type: "TIMEOUT" })).toBe("SPINNING");
-    // Hands are on the keyboard: no gesture reaches the machine while typing.
-    expect(gesturesIgnored("NAME_ENTRY")).toBe(true);
-    expect(transition("NAME_ENTRY", { type: "OPEN_PALM" })).toBeNull();
+    // Hands are on the keyboard: only the always-on open palm (end session) reaches the machine while typing.
+    expect(gesturesForState("NAME_ENTRY")).toEqual(["open_palm"]);
+    expect(transition("NAME_ENTRY", { type: "OPEN_PALM" })).toBe("BOOT");
     expect(transition("NAME_ENTRY", { type: "THUMB_UP" })).toBeNull();
     // Battles have no leaderboard entry: straight to the card.
     expect(transition("BATTLE_RESULT", { type: "THUMB_UP" })).toBe("CLAIM");
@@ -93,7 +104,7 @@ describe("kiosk state machine", () => {
     // A failed score sends that player back to the lobby.
     expect(transition("BATTLE_INTRO", { type: "SLOT_FAILED", captureId: "c", message: "x" })).toBe("LOBBY");
     expect(transition("BATTLE_INTRO", { type: "ANALYSIS_FAILED", message: "x" })).toBe("LOBBY");
-    expect(gesturesIgnored("BATTLE_INTRO")).toBe(true);
+    expect(gesturesForState("BATTLE_INTRO")).toEqual(["open_palm"]);
     expect(gesturesIgnored("LOBBY_COUNTDOWN")).toBe(true);
     expect(gesturesForState("LOBBY")).toEqual(expect.arrayContaining(["double_peace", "thumb_up", "open_palm"]));
   });

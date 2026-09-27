@@ -297,4 +297,17 @@ describe("gesture engine", () => {
     path.forEach((x, i) => events.push(...e.update(frame(i * 100, [hand("Open_Palm", x)]), RESULT)));
     expect(events.filter((ev) => ev.type === "wave")).toEqual([]);
   });
+  it("a long wave never fills the open palm (the always-on end session)", () => {
+    // READY takes both the wave and the palm: 3 s of waving must only wave.
+    const READY = allowedGestures(gesturesForState("READY"), true);
+    const e = new GestureEngine();
+    const events: GestureEvent[] = [];
+    const sweep = [0.3, 0.35, 0.4, 0.45, 0.5, 0.45, 0.4, 0.35];
+    for (let i = 0; i * 66 <= 3000; i++) events.push(...e.update(frame(i * 66, [hand("Open_Palm", sweep[i % sweep.length], "Right", 0.8)]), READY));
+    expect(events.some((ev) => ev.type === "wave")).toBe(true);
+    expect(events.filter((ev) => ev.type === "open_palm")).toEqual([]);
+    // A still, raised palm afterwards still ends the session.
+    const still = hold(e, [hand("Open_Palm", 0.4, "Right", 0.8)], 1800, READY, 5600);
+    expect(still).toEqual([{ type: "open_palm" }]);
+  });
 });

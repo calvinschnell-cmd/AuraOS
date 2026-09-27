@@ -283,6 +283,11 @@ export class GestureEngine {
     // Two fists up, but the other person in frame is not in on it (yet).
     const battleWaiting = fistPeople.length >= 1 && battlers.length === 1 && frame.poses.length >= 2;
     const doublePeaceSeen = doublePeacePeople.length === 1 && battlers.length === 1 && framed(doublePeacePeople[0]);
+    // A wave is an open palm too: while one is swinging (or just fired) the
+    // palm hold (end session) never fills, so only a still, raised palm reboots.
+    // Two direction changes make a swing; one is just a hand moving (or reappearing).
+    const waving = frame.t < this.waveRefractoryUntil || [...this.waves.values()].some((t) => t.reversals.length >= 2 && frame.t - t.lastSeen < 600);
+    if (waving) this.progress.set("open_palm", 0);
 
     const seen: Record<EngineGesture, boolean> = {
       battle: battleSeen,
@@ -291,7 +296,7 @@ export class GestureEngine {
       double_fist: false,
       thumb_up: thumbUp,
       thumb_down: thumbDown,
-      open_palm: openPalm,
+      open_palm: openPalm && !waving,
       wave: false,
     };
     // Fill speed per gesture: 1 when seen, bridgeFill across tracker dropouts, else 0 (drain).
