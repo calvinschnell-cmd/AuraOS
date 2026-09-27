@@ -1,7 +1,7 @@
 # Kiosk audio (local only)
 
-Everything the mirror plays from this folder is **gitignored**: it never goes
-to GitHub or the public server (the deploy ships the git tree), and a server
+Everything the mirror plays from this folder is **in git** (so a fresh laptop clone has it) but
+marked `export-ignore` (`.gitattributes`): the deploy (`git archive`) never ships it to the public server, and a server
 without it just stays quiet or synthesizes.
 
 | File | Used for |

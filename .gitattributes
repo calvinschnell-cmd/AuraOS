@@ -1,0 +1,5 @@
+# Kiosk audio lives in git for the laptop, but the deploy (git archive) leaves it off the public server.
+public/audio/*.flac export-ignore
+public/audio/reactions/** export-ignore
+*.flac binary
+*.mp3 binary
