@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { bootSequence } from "@/lib/kiosk/boot";
+import { bootSequence, type BootLine } from "@/lib/kiosk/boot";
 import type { CameraStatus, KioskMode } from "@/lib/kiosk/types";
 
 interface Progress {
@@ -18,6 +18,23 @@ const LINE_GAP_MS = 140;
 const DONE_MS = 650;
 /** Time multiplier for the session-end reboot. */
 const QUICK_SPEED = 0.25;
+
+/** When each boot line starts typing, finishes, gets its status stamp and ends (ms from mount). */
+function bootTimeline(lines: BootLine[], speed: number): { start: number; typed: number; stamped: number; end: number }[] {
+  const out: { start: number; typed: number; stamped: number; end: number }[] = [];
+  let t = 0;
+  for (const line of lines) {
+    const start = t;
+    // Uneven key timing reads more like typing than a fixed cadence.
+    for (let c = 0; c < line.text.length; c++) t += CHAR_MS * (0.6 + ((c * 7919) % 10) / 10) * speed;
+    const typed = t;
+    if (line.status) t += line.delay * speed;
+    const stamped = t;
+    t += (line.status ? LINE_GAP_MS : line.delay) * speed;
+    out.push({ start, typed, stamped, end: t });
+  }
+  return out;
+}
 
 /** Boot sequence typed out character by character with a blinking cursor. */
 export function BootScreen({
@@ -41,37 +58,49 @@ export function BootScreen({
     [mode, databaseConfigured, mockMode, cameraStatus, quick],
   );
   const speed = quick ? QUICK_SPEED : 1;
-  const [p, setP] = useState<Progress>({ index: 0, chars: 0, status: false });
   // Kept in a ref so a parent re-render (camera status, gesture debug pushes)
-  // never clears and restarts the pending typing timer: under load that would
-  // keep the sequence stuck on its first line.
+  // never restarts the sequence.
   const onDoneRef = useRef(onDone);
   useEffect(() => {
     onDoneRef.current = onDone;
   }, [onDone]);
 
+  // The whole sequence as a timeline: when each line starts typing, finishes,
+  // gets its status stamp and ends. What is on screen comes from the time since
+  // mount, so a busy main thread (the mannequin rebuilding on a reboot, the
+  // trackers) can delay frames but never stretch the boot out.
+  const timeline = useMemo(() => bootTimeline(lines, speed), [lines, speed]);
+  const total = (timeline.at(-1)?.end ?? 0) + DONE_MS * speed;
+
+  const startedAt = useRef<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    if (p.index >= lines.length) {
-      const id = window.setTimeout(() => onDoneRef.current(), DONE_MS * speed);
-      return () => window.clearTimeout(id);
-    }
-    const line = lines[p.index];
-    let ms: number;
-    let next: Progress;
-    if (p.chars < line.text.length) {
-      // Uneven key timing reads more like typing than a fixed cadence.
-      ms = CHAR_MS * (0.6 + ((p.chars * 7919) % 10) / 10);
-      next = { ...p, chars: p.chars + 1 };
-    } else if (line.status && !p.status) {
-      ms = line.delay;
-      next = { ...p, status: true };
-    } else {
-      ms = line.status ? LINE_GAP_MS : line.delay;
-      next = { index: p.index + 1, chars: 0, status: false };
-    }
-    const id = window.setTimeout(() => setP(next), ms * speed);
-    return () => window.clearTimeout(id);
-  }, [p, lines, speed]);
+    if (startedAt.current === null) startedAt.current = performance.now();
+    const start = startedAt.current;
+    let timer = 0;
+    const tick = () => {
+      const e = performance.now() - start;
+      setElapsed(e);
+      if (e >= total) {
+        onDoneRef.current();
+        return;
+      }
+      timer = window.setTimeout(tick, CHAR_MS);
+    };
+    timer = window.setTimeout(tick, 0);
+    return () => window.clearTimeout(timer);
+  }, [total]);
+
+  const at = timeline.findIndex((tl) => elapsed < tl.end);
+  const index = at === -1 ? lines.length : at;
+  const current = timeline[index];
+  const p: Progress = current
+    ? {
+        index,
+        chars: Math.min(lines[index].text.length, Math.max(0, Math.ceil(((elapsed - current.start) / Math.max(1, current.typed - current.start)) * lines[index].text.length))),
+        status: elapsed >= current.stamped,
+      }
+    : { index, chars: 0, status: false };
 
   return (
     <div className="boot-screen">

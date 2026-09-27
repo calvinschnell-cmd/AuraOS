@@ -135,7 +135,8 @@ function contextFor(lobby: Lobby | null, reveal: SquadReveal | null): Transition
 
 function reduce(ms: Internal, action: Action): Internal {
   if (action.kind === "reboot") {
-    return { ...initial(action.now, action.seed), bootCount: ms.bootCount + 1, scansToday: ms.scansToday };
+    // [REBOOT]: the quick boot (4x), not the ~10 s first-launch sequence (a long black screen).
+    return { ...initial(action.now, action.seed), bootCount: ms.bootCount + 1, scansToday: ms.scansToday, quickBoot: true };
   }
   const { event, now, seed, rand, gen } = action;
   const nextLobby = lobbyAfter(ms.session.lobby, event);
