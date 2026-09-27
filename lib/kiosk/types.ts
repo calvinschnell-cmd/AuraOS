@@ -334,13 +334,16 @@ export interface CardResponse {
   entry: LeaderboardEntry | null;
 }
 
-export const REMOTE_COMMANDS = ["scan", "battle", "squad", "start", "wave", "reset", "mute", "music", "voice", "mode"] as const;
+/** "settings" changes kiosk settings (camera, sound) from /admin; "soundtest" plays a chime and a line. */
+export const REMOTE_COMMANDS = ["scan", "battle", "squad", "start", "wave", "reset", "mute", "music", "voice", "mode", "settings", "soundtest"] as const;
 export type RemoteCommandName = (typeof REMOTE_COMMANDS)[number];
 
 export interface RemoteCommand {
   id: number;
   command: RemoteCommandName;
   at: number;
+  /** "settings" only: the settings to change (validated by parseSettingsPatch). */
+  settings?: Partial<RemoteSettings>;
 }
 
 export interface SessionState {
@@ -400,6 +403,16 @@ export interface KioskSettings {
   /** Silence just the music, or just the voice (admin MUTE MUSIC / MUTE VOICE); `muted` silences everything. */
   musicMuted: boolean;
   voiceMuted: boolean;
+  /** Per-channel levels 0..1, multiplied by the master `volume` (set from /admin). */
+  musicVolume: number;
+  voiceVolume: number;
+  /** Synthesized effects and crowd reactions. */
+  effectsVolume: number;
+  /** Browser voice for the announcer (a SpeechSynthesisVoice name); null picks the default announcer voice. */
+  voiceName: string | null;
+  /** Browser voice speed and pitch (the ElevenLabs voice ignores them). */
+  voiceRate: number;
+  voicePitch: number;
   performanceMode: boolean;
   /** Segmentation aura around the person (live feed + reveal photo). Off by default. */
   auraGlow: boolean;
@@ -415,6 +428,25 @@ export interface KioskSettings {
 
 export type FeedFit = "contain" | "cover";
 
+/** The kiosk settings /admin can change remotely: the camera and the sound. */
+export const REMOTE_SETTING_KEYS = [
+  "cameraDeviceId",
+  "cameraRotation",
+  "flipFeed",
+  "feedFit",
+  "muted",
+  "musicMuted",
+  "voiceMuted",
+  "volume",
+  "musicVolume",
+  "voiceVolume",
+  "effectsVolume",
+  "voiceName",
+  "voiceRate",
+  "voicePitch",
+] as const satisfies readonly (keyof KioskSettings)[];
+export type RemoteSettings = Pick<KioskSettings, (typeof REMOTE_SETTING_KEYS)[number]>;
+
 export const DEFAULT_SETTINGS: KioskSettings = {
   cameraDeviceId: null,
   flipFeed: true,
@@ -426,6 +458,12 @@ export const DEFAULT_SETTINGS: KioskSettings = {
   volume: 0.8,
   musicMuted: false,
   voiceMuted: false,
+  musicVolume: 1,
+  voiceVolume: 1,
+  effectsVolume: 1,
+  voiceName: null,
+  voiceRate: 0.92,
+  voicePitch: 0.72,
   performanceMode: false,
   auraGlow: false,
   feedFit: "contain",

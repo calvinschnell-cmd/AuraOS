@@ -11,6 +11,7 @@ Run:  .venv\\Scripts\\python server.py   (or `npm run ml` from the repo root)
 import io
 import logging
 import os
+import re
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -48,6 +49,16 @@ state: dict = {}
 gpu_lock = threading.Lock()
 
 
+def arch_supported(major: int, minor: int, arch_list: list[str]) -> bool:
+    """A torch build runs on the archs it lists and, by CUDA binary compatibility, on
+    newer GPUs of the same major version (its sm_86 kernels run on an RTX 40-series sm_89)."""
+    for a in arch_list:
+        m = re.fullmatch(r"sm_(\d+)(\d)", a)
+        if m and int(m.group(1)) == major and int(m.group(2)) <= minor:
+            return True
+    return False
+
+
 def require_cuda() -> torch.device:
     """Both kiosk machines have NVIDIA GPUs: fail loudly instead of crawling on CPU."""
     if not torch.cuda.is_available():
@@ -58,7 +69,7 @@ def require_cuda() -> torch.device:
         )
     major, minor = torch.cuda.get_device_capability(0)
     arch = f"sm_{major}{minor}"
-    if arch not in torch.cuda.get_arch_list():
+    if not arch_supported(major, minor, torch.cuda.get_arch_list()):
         raise RuntimeError(
             f"{torch.cuda.get_device_name(0)} is {arch}, which torch {torch.__version__} was not built for "
             f"(has {', '.join(torch.cuda.get_arch_list())}). RTX 50-series needs the cu128 or newer wheel."

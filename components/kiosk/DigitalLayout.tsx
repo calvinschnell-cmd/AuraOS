@@ -103,7 +103,7 @@ export function DigitalLayout(p: KioskViewProps) {
                 {(idle || state === "READY") && session.soloRoastIndex !== null && (
                   <SoloBattleWindow key={session.soloRoastTick} text={SOLO_BATTLE_ROASTS[session.soloRoastIndex]} />
                 )}
-                {showingResult && (
+                {showingResult && state !== "CLAIM" && (
                   <OsWindow title="CAPTURE.JPG" className="reveal-photo-window" still>
                     {scan.mock && <MockNotice />}
                     <RevealPhoto scan={scan} reveal={reveal} glow={p.settings.auraGlow && !p.settings.performanceMode} />

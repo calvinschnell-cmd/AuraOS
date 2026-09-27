@@ -7,7 +7,7 @@ import type { GenerateOptions } from "@/lib/clothing/generator";
 import { outfitSignature } from "@/lib/clothing/generator";
 import type { CostumeType } from "@/lib/clothing/types";
 import { SOLO_BATTLE_ROASTS } from "@/lib/copy";
-import { auraCallout, useAnnouncer } from "@/lib/kiosk/announcer";
+import { auraCallout, useAnnouncer, useBrowserVoices } from "@/lib/kiosk/announcer";
 import { analyzeFrame, fetchRoast, fetchUsageStats } from "@/lib/kiosk/api";
 import { captureLobby, createBattle, scoreCapture, streamCommentary, warmUp } from "@/lib/kiosk/battle";
 import { isIdleState } from "@/lib/kiosk/machine";
@@ -15,10 +15,11 @@ import { makeKioskQrDataUrl } from "@/lib/kiosk/qr";
 import type { PoseSnapshot } from "@/lib/pose/landmarks";
 import { MeltdownTracker } from "@/lib/kiosk/meltdown";
 import { useKioskMusic } from "@/lib/kiosk/music";
-import { reactionFor } from "@/lib/kiosk/reactionTiers";
+import { REACTIONS, reactionFor } from "@/lib/kiosk/reactionTiers";
 import { useReactions } from "@/lib/kiosk/reactions";
 import { useAudioAllowed, useSoundEngine } from "@/lib/kiosk/sound";
-import { CAMERA_ROTATIONS, type KioskEvent, type KioskMode, type RemoteCommandName, type ScreenSide, type UsageStats } from "@/lib/kiosk/types";
+import { pickRemoteSettings } from "@/lib/kiosk/remoteSettings";
+import { CAMERA_ROTATIONS, type KioskEvent, type KioskMode, type RemoteCommand, type ScreenSide, type UsageStats } from "@/lib/kiosk/types";
 import type { ModeChoice } from "./props";
 import { useCamera } from "@/lib/kiosk/useCamera";
 import { useBattleAnnouncer } from "@/lib/kiosk/useBattleAnnouncer";
@@ -54,7 +55,18 @@ const MIRROR_TEXT_BOOST = 1.3;
  * whichever layout the mode selects. `mockMode` comes from the server page:
  * OPENAI_API_KEY is server-only, so the browser cannot check it itself.
  */
-export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl = null }: { mockMode: boolean; databaseConfigured: boolean; publicBaseUrl?: string | null }) {
+export default function KioskApp({
+  mockMode,
+  databaseConfigured,
+  publicBaseUrl = null,
+  preferredCamera = null,
+}: {
+  mockMode: boolean;
+  databaseConfigured: boolean;
+  publicBaseUrl?: string | null;
+  /** KIOSK_CAMERA: part of a camera's name; picked automatically while no camera is chosen. */
+  preferredCamera?: string | null;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const mode: KioskMode = params.get("mode") === "mirror" ? "mirror" : "digital";
@@ -62,6 +74,13 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
   const [settings, updateSettings] = useSettings();
   const camera = useCamera(settings.cameraDeviceId);
   const { videoRef } = camera;
+  // Camera names only show up once the default camera is open: then switch to the preferred one (and remember it).
+  useEffect(() => {
+    if (settings.cameraDeviceId || !preferredCamera) return;
+    const want = preferredCamera.toLowerCase();
+    const match = camera.devices.find((d) => d.label.toLowerCase().includes(want));
+    if (match) updateSettings({ cameraDeviceId: match.deviceId });
+  }, [settings.cameraDeviceId, preferredCamera, camera.devices, updateSettings]);
 
   // Dev override: C cycles none -> mascot -> astronaut -> diver so the 1% rolls can be checked.
   const [costumeOverride, setCostumeOverride] = useState<CostumeType | null>(null);
@@ -187,11 +206,26 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
   // Quiet background loop + result jingle; never under a voice line (lib/kiosk/music.ts).
   // The crowd reacts to a solo aura (cheer, WOOOOO, crickets, awww, fail), right after the number is said.
   const reactions = useReactions(sound);
-  const music = useKioskMusic({ sound, announcer, state, muted: settings.muted || settings.musicMuted, volume: settings.volume });
+  const music = useKioskMusic({ sound, announcer, state, muted: settings.muted || settings.musicMuted, volume: settings.volume * settings.musicVolume });
   useEffect(() => {
-    announcer.setVolume(settings.volume);
-    sound.setVolume(settings.volume);
-  }, [announcer, sound, settings.volume]);
+    announcer.setVolume(settings.volume * settings.voiceVolume);
+    sound.setVolume(settings.volume * settings.effectsVolume);
+  }, [announcer, sound, settings.volume, settings.voiceVolume, settings.effectsVolume]);
+  useEffect(() => {
+    announcer.setVoiceOptions({ name: settings.voiceName, rate: settings.voiceRate, pitch: settings.voicePitch });
+  }, [announcer, settings.voiceName, settings.voiceRate, settings.voicePitch]);
+  const voices = useBrowserVoices();
+  // Which sound files this machine has (reported to /admin SOUND: they are gitignored, so a fresh clone has none).
+  const [audioFiles, setAudioFiles] = useState({ music: false, jingle: false, crowdClips: 0 });
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([music.load(), reactions.load()]).then(() => {
+      if (!cancelled) setAudioFiles({ music: music.trackLength !== null, jingle: music.hasJingle, crowdClips: REACTIONS.filter((r) => reactions.hasClip(r)).length });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [music, reactions]);
   /** The result moment: the jingle (the voice waits for it), or the old impact sound without the file. */
   const resultSting = useCallback(
     (negative = false) => {
@@ -289,6 +323,9 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
       people: gestures.debug.personCount,
       framing: gestures.debug.framing,
       scansToday: machine.scansToday,
+      settings: pickRemoteSettings(settings),
+      cameras: camera.devices.map((d, i) => ({ id: d.deviceId, label: d.label || `CAMERA ${i + 1}` })),
+      audio: { unlocked: audioAllowed, ...audioFiles, crowdTotal: REACTIONS.length, voices },
     }),
   );
 
@@ -358,7 +395,7 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
 
   // ---- operator remote (/admin controls)
   const onRemote = useCallback(
-    (command: RemoteCommandName) => {
+    ({ command, settings: patch }: RemoteCommand) => {
       switch (command) {
         case "scan":
           send({ type: "SCAN" });
@@ -390,9 +427,16 @@ export default function KioskApp({ mockMode, databaseConfigured, publicBaseUrl =
         case "mode":
           toggleMode();
           break;
+        case "settings":
+          if (patch) updateSettings(patch);
+          break;
+        case "soundtest":
+          sound.chime();
+          announcer.say(["Sound check.", "Aura O S is live."]);
+          break;
       }
     },
-    [send, simulateWave, updateSettings, settings.muted, settings.musicMuted, settings.voiceMuted, toggleMode],
+    [send, simulateWave, updateSettings, settings.muted, settings.musicMuted, settings.voiceMuted, toggleMode, sound, announcer],
   );
   useRemote(onRemote);
 

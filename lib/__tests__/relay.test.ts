@@ -31,6 +31,18 @@ describe("kiosk relay (memory, MOCK MODE)", () => {
     expect((await relay.challenges()).some((c) => c.name === "Relay Walk-in")).toBe(false);
   });
 
+  it("carries a settings change with its command", async () => {
+    const relay = getRelay();
+    const { cursor } = await relay.commandsSince(0);
+    await relay.pushCommand("settings", { cameraRotation: 180, voiceVolume: 0.4 });
+    await relay.pushCommand("soundtest");
+    const { commands } = await relay.commandsSince(cursor);
+    expect(commands.map((c) => [c.command, c.settings])).toEqual([
+      ["settings", { cameraRotation: 180, voiceVolume: 0.4 }],
+      ["soundtest", undefined],
+    ]);
+  });
+
   it("never takes a mirror launch request without a shared database", async () => {
     const relay = getRelay();
     await expect(relay.requestMirrorLaunch()).rejects.toThrow();

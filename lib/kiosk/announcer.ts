@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { VOICE_CLIENT_TIMEOUT_MS } from "@/lib/config";
 
 /**
@@ -30,9 +30,11 @@ let premiumVoiceOff = false;
 
 const PREFERRED = ["Google UK English Male", "Microsoft Guy", "Microsoft David", "Daniel", "Google US English", "Alex"];
 
-function pickVoice(): SpeechSynthesisVoice | null {
+function pickVoice(chosen: string | null = null): SpeechSynthesisVoice | null {
   if (typeof speechSynthesis === "undefined") return null;
   const voices = speechSynthesis.getVoices();
+  const exact = chosen ? voices.find((v) => v.name === chosen) : undefined;
+  if (exact) return exact;
   for (const name of PREFERRED) {
     const v = voices.find((x) => x.name.includes(name));
     if (v) return v;
@@ -81,14 +83,25 @@ export class Announcer {
   private busyListeners = new Set<(busy: boolean) => void>();
   private audio: HTMLAudioElement | null = null;
   private voice: SpeechSynthesisVoice | null = null;
+  /** Browser voice settings (/admin SOUND): a voice by name (null = the announcer default), speed and pitch. */
+  private voiceName: string | null = null;
+  private rate = 0.92;
+  private pitch = 0.72;
 
   constructor() {
     if (typeof speechSynthesis !== "undefined") {
       this.voice = pickVoice();
       speechSynthesis.addEventListener?.("voiceschanged", () => {
-        this.voice = pickVoice();
+        this.voice = pickVoice(this.voiceName);
       });
     }
+  }
+
+  setVoiceOptions({ name, rate, pitch }: { name: string | null; rate: number; pitch: number }): void {
+    this.voiceName = name;
+    this.rate = rate;
+    this.pitch = pitch;
+    this.voice = pickVoice(name);
   }
 
   get available(): boolean {
@@ -276,8 +289,8 @@ export class Announcer {
     return new Promise((resolve) => {
       const u = new SpeechSynthesisUtterance(text);
       if (this.voice) u.voice = this.voice;
-      u.rate = 0.92;
-      u.pitch = 0.72;
+      u.rate = this.rate;
+      u.pitch = this.pitch;
       u.volume = this.volume;
       u.onend = () => resolve();
       u.onerror = () => resolve();
@@ -300,6 +313,29 @@ export function auraCallout(aura: number): string[] {
   if (aura >= 500_000) return ["Your aura is...", `${n}!`, "Unbelievable scenes.", "Somebody frame this shit."];
   if (aura >= 150_000) return ["Your aura is...", `${n}!`, "That fit goes hard."];
   return ["Your aura is...", `${n}.`];
+}
+
+/** Edge lists hundreds of voices: the kiosk status report (16 KB max) carries at most this many. */
+const MAX_VOICES = 60;
+
+/** Names of the English browser voices (they load asynchronously, so this updates when they arrive). */
+export function useBrowserVoices(): string[] {
+  const [voices, setVoices] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof speechSynthesis === "undefined") return;
+    const read = () =>
+      setVoices(
+        speechSynthesis
+          .getVoices()
+          .filter((v) => v.lang.startsWith("en"))
+          .slice(0, MAX_VOICES)
+          .map((v) => v.name),
+      );
+    read();
+    speechSynthesis.addEventListener?.("voiceschanged", read);
+    return () => speechSynthesis.removeEventListener?.("voiceschanged", read);
+  }, []);
+  return voices;
 }
 
 export function useAnnouncer(muted: boolean): Announcer {

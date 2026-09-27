@@ -16,6 +16,16 @@ const KioskApp = dynamic(() => import("@/components/kiosk/KioskApp"), {
   ),
 });
 
-export default function KioskClient({ mockMode, databaseConfigured, publicBaseUrl }: { mockMode: boolean; databaseConfigured: boolean; publicBaseUrl: string | null }) {
-  return <KioskApp mockMode={mockMode} databaseConfigured={databaseConfigured} publicBaseUrl={publicBaseUrl} />;
+export default function KioskClient({
+  mockMode,
+  databaseConfigured,
+  publicBaseUrl,
+  preferredCamera,
+}: {
+  mockMode: boolean;
+  databaseConfigured: boolean;
+  publicBaseUrl: string | null;
+  preferredCamera: string | null;
+}) {
+  return <KioskApp mockMode={mockMode} databaseConfigured={databaseConfigured} publicBaseUrl={publicBaseUrl} preferredCamera={preferredCamera} />;
 }

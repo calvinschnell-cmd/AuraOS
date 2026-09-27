@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { isDatabaseConfigured, isMockMode } from "@/lib/env";
+import { getPreferredCamera, isDatabaseConfigured, isMockMode } from "@/lib/env";
 import { publicBaseUrlForHost } from "@/lib/server/baseUrl";
 import KioskClient from "./KioskClient";
 
@@ -18,7 +18,7 @@ export default async function KioskPage() {
   const publicBaseUrl = publicBaseUrlForHost(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto") ?? "http");
   return (
     <Suspense fallback={null}>
-      <KioskClient mockMode={isMockMode()} databaseConfigured={isDatabaseConfigured()} publicBaseUrl={publicBaseUrl} />
+      <KioskClient mockMode={isMockMode()} databaseConfigured={isDatabaseConfigured()} publicBaseUrl={publicBaseUrl} preferredCamera={getPreferredCamera()} />
     </Suspense>
   );
 }

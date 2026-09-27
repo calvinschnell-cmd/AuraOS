@@ -21,6 +21,11 @@ export function getAdminKey(): string | null {
   return process.env.ADMIN_KEY?.trim() || null;
 }
 
+/** KIOSK_CAMERA: part of a camera's name (e.g. "CAM 313"); the kiosk uses it until someone picks another camera. */
+export function getPreferredCamera(): string | null {
+  return process.env.KIOSK_CAMERA?.trim() || null;
+}
+
 /** Aura Certificate printing (Stage 13). Off unless PRINTING_ENABLED=true. */
 export function isPrintingEnabled(): boolean {
   return process.env.PRINTING_ENABLED?.trim().toLowerCase() === "true";

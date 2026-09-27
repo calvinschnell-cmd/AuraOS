@@ -406,3 +406,58 @@
   align-self: flex-start;
   font-size: 0.55rem;
 }
+
+/* CAMERA.EXE / SOUND.EXE: label + control rows (components/admin/KioskSettingsPanels.tsx) */
+.op-form {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, auto) 1fr;
+  gap: 0.45rem 0.7rem;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+.op-form > label:not(.op-form__check) {
+  font-family: var(--font-heading);
+  font-size: 0.5rem;
+  letter-spacing: 0.15em;
+  opacity: 0.75;
+}
+.op-form select.op-input {
+  width: 100%;
+  font-size: 0.7rem;
+}
+.op-form select.op-input option {
+  background: var(--aura-ink);
+}
+.op-form__range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.op-form__range input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--aura-cyan);
+}
+.op-form__value {
+  width: 3.2rem;
+  text-align: right;
+  font-size: 0.75rem;
+}
+.op-form__check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.op-form__check input {
+  accent-color: var(--aura-cyan);
+}
+.op-banner--inline {
+  margin: 0 0 0.6rem;
+}
+.op-facts--sound {
+  margin-top: 0.6rem;
+}

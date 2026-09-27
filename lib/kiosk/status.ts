@@ -1,4 +1,4 @@
-import type { KioskMode, KioskState, SessionState } from "./types";
+import type { KioskMode, KioskState, RemoteSettings, SessionState } from "./types";
 
 /**
  * What the mirror is doing right now, as the operator dashboard sees it. The
@@ -37,6 +37,25 @@ export interface KioskStatus {
     reveal: { shown: number; total: number } | null;
   } | null;
   card: { id: string; pageUrl: string } | null;
+  /** The camera and sound settings /admin can change (older mirrors do not send these). */
+  settings?: RemoteSettings;
+  /** Cameras the mirror's browser can see (labels only once camera access was granted). */
+  cameras?: { id: string; label: string }[];
+  audio?: KioskAudioReport;
+}
+
+/** Whether the mirror can make sound, and which of its sound sources are there. */
+export interface KioskAudioReport {
+  /** False until the page gets a click or key press (Chrome's autoplay rule). */
+  unlocked: boolean;
+  /** public/audio/kiosk-bg.flac and result-jingle.flac loaded. */
+  music: boolean;
+  jingle: boolean;
+  /** Crowd reaction clips loaded (the rest are synthesized). */
+  crowdClips: number;
+  crowdTotal: number;
+  /** Browser voices the announcer can use. */
+  voices: string[];
 }
 
 /** Older than this: the mirror is closed or asleep. */
@@ -54,6 +73,9 @@ export function buildKioskStatus(input: {
   people: number;
   framing: string;
   scansToday: number;
+  settings?: RemoteSettings;
+  cameras?: { id: string; label: string }[];
+  audio?: KioskAudioReport;
 }): Omit<KioskStatus, "at"> {
   const { session: s } = input;
   const scan = s.scan && !s.battle && !s.lobby ? { nickname: s.scan.analysis.nickname, aura: s.scan.aura, rank: s.scan.rank ? `#${s.scan.rank.position} of ${s.scan.rank.total}` : null } : null;
@@ -87,6 +109,9 @@ export function buildKioskStatus(input: {
         }
       : null,
     card: s.card ? { id: s.card.id, pageUrl: s.card.pageUrl } : null,
+    settings: input.settings,
+    cameras: input.cameras,
+    audio: input.audio,
   };
 }
 

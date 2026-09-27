@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { RemoteCommand, RemoteCommandName } from "./types";
+import type { RemoteCommand } from "./types";
 
 /** Kiosk side of the operator remote: polls the server's command queue (/api/remote). */
-export function useRemote(onCommand: (command: RemoteCommandName) => void, pollMs = 1000): void {
+export function useRemote(onCommand: (command: RemoteCommand) => void, pollMs = 1000): void {
   const handler = useRef(onCommand);
   useEffect(() => {
     handler.current = onCommand;
@@ -30,7 +30,7 @@ export function useRemote(onCommand: (command: RemoteCommandName) => void, pollM
         for (const c of body.commands) {
           if (!seen.has(c.id)) {
             seen.add(c.id);
-            handler.current(c.command);
+            handler.current(c);
           }
         }
         cursor = body.cursor;

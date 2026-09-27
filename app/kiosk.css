@@ -1688,33 +1688,48 @@
 }
 
 /* ---- phone companion QR codes (idle: /scan, claim: /r/[id]) */
-/* Black on white, big modules: they sit behind the one-way acrylic and must read from ~1.5 m. */
+/* Black on white, pixelated modules: they sit behind the one-way acrylic. The window hugs the code. */
 .phone-scan-window,
 .claim-window {
-  width: min(92vw, 34rem);
+  width: min-content;
+  max-width: min(92vw, 34rem);
 }
 .phone-scan-qr,
 .claim-qr {
   display: block;
-  width: min(100%, 24vh);
+  width: 14vh;
+  max-width: none;
   height: auto;
   aspect-ratio: 1;
   background: #ffffff;
   image-rendering: pixelated;
 }
 .claim-qr {
-  width: min(100%, 30vh);
+  width: 18vh;
   border: 0;
 }
-.kiosk-main--mirror .phone-scan-window {
-  width: 100%;
-}
-.kiosk-main--mirror .phone-scan-qr {
-  width: min(100%, 22vh);
-}
-/* Mirror: the claim QR takes the whole panel width and sits over the capture photo. */
+/* Mirror: the claim window sits above everything on the stage. */
 .kiosk-main--mirror .claim-window {
   position: relative;
   z-index: 5;
-  width: 100%;
+}
+.kiosk-main--mirror .phone-scan-window {
+  align-self: center;
+}
+/* Portrait digital: the side panel is short, so the phone QR takes the left and the terminal + tide chart stack on the right. */
+@media (orientation: portrait) {
+  .kiosk-main:not(.kiosk-main--mirror) .kiosk-main__side:has(> .phone-scan-window) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .kiosk-main:not(.kiosk-main--mirror) .kiosk-main__side > .phone-scan-window {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-self: start;
+  }
+  .kiosk-main:not(.kiosk-main--mirror) .kiosk-main__side:has(> .phone-scan-window) > :not(.phone-scan-window) {
+    grid-column: 2;
+    min-height: 0;
+  }
 }

@@ -41,7 +41,11 @@ if (Test-Path $py) {
 }
 
 Step "PyTorch with CUDA"
+# Windows PowerShell 5.1 turns a native command's stderr into a terminating error under "Stop",
+# even with 2>$null: a fresh venv (no torch yet) must not end the script here.
+$ErrorActionPreference = "Continue"
 $torchState = & $py -c "import torch, torchvision; print('cuda' if torch.cuda.is_available() else 'cpu')" 2>$null
+$ErrorActionPreference = "Stop"
 if ($torchState -eq "cuda") {
   Found (& $py -c "import torch, torchvision; print(f'torch {torch.__version__}, torchvision {torchvision.__version__}, {torch.cuda.get_device_name(0)}')")
 } else {
@@ -55,6 +59,6 @@ Step "Service requirements"
 Found "transformers, fastapi, uvicorn, python-multipart, pillow"
 
 Step "Verify"
-& $py -c "import torch; assert torch.cuda.is_available(), 'CUDA still unavailable'; cap = 'sm_%d%d' % torch.cuda.get_device_capability(0); assert cap in torch.cuda.get_arch_list(), cap + ' not in this torch build'; print('   OK:', torch.cuda.get_device_name(0), cap, 'torch', torch.__version__)"
+& $py -c "import torch; assert torch.cuda.is_available(), 'CUDA still unavailable'; major, minor = torch.cuda.get_device_capability(0); cap = 'sm_%d%d' % (major, minor); assert any(a[3:-1] == str(major) and int(a[-1]) <= minor for a in torch.cuda.get_arch_list()), cap + ' not supported by this torch build'; print('   OK:', torch.cuda.get_device_name(0), cap, 'torch', torch.__version__)"
 if ($LASTEXITCODE -ne 0) { throw "Verification failed (see above)." }
 Write-Host "`nDone. Start the sidecar with: npm run ml" -ForegroundColor Cyan

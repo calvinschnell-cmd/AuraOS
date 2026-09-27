@@ -103,7 +103,7 @@ export function MirrorLayout(p: KioskViewProps) {
               />
               {state === "BATTLE_INTRO" && lobby && <VsIntro lobby={lobby} />}
               {session.meltdown === "annoyed" && state !== "SULKING" && <AngerSymbol />}
-              {showingResult && (
+              {showingResult && state !== "CLAIM" && (
                 <OsWindow title="CAPTURE.JPG" className="reveal-photo-window mirror-stage-photo" still>
                   {scan.mock && <MockNotice />}
                   <RevealPhoto scan={scan} reveal={reveal} glow={false} />

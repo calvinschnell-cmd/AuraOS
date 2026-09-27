@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
 import { AdminKeyGate, useAdminKey } from "@/components/admin/AdminKeyGate";
+import { CameraPanel, SoundPanel } from "@/components/admin/KioskSettingsPanels";
 import type { FeedEntry } from "@/lib/feed/types";
 import { makeQrDataUrl } from "@/lib/kiosk/qr";
 import { KIOSK_STATUS_STALE_MS, type KioskStatus } from "@/lib/kiosk/status";
@@ -488,6 +489,12 @@ export function AdminDashboard({ publicBaseUrl = null }: { publicBaseUrl?: strin
               ))}
             </div>
             <div className="op-note">{sent ?? "SENDS STRAIGHT TO THE MIRROR."}</div>
+          </Win>
+          <Win title="CAMERA.EXE">
+            <CameraPanel adminKey={key} status={liveStatus} now={now} />
+          </Win>
+          <Win title="SOUND.EXE">
+            <SoundPanel adminKey={key} status={liveStatus} now={now} />
           </Win>
           <Win title="PHONE_QR.EXE">
             <PhoneQr url={phoneUrl} />

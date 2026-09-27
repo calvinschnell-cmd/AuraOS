@@ -31,7 +31,8 @@ export interface Relay {
   setKioskStatus(status: Omit<KioskStatus, "at">): Promise<void>;
   /** `at` is on this server's clock. */
   kioskStatus(): Promise<KioskStatus | null>;
-  pushCommand(command: RemoteCommandName): Promise<RemoteCommand>;
+  /** `settings` goes with the "settings" command (already validated). */
+  pushCommand(command: RemoteCommandName, settings?: RemoteCommand["settings"]): Promise<RemoteCommand>;
   commandsSince(cursor: number): Promise<{ cursor: number; commands: RemoteCommand[] }>;
   challenges(): Promise<Challenge[]>;
   /** Join the line (a name already waiting is not queued twice). Position is 1-based. */
@@ -55,7 +56,7 @@ const memoryRelay: Relay = {
   kind: "memory",
   setKioskStatus: async (status) => setKioskStatus({ ...status, at: Date.now() }),
   kioskStatus: async () => getKioskStatus(),
-  pushCommand: async (command) => pushRemoteCommand(command),
+  pushCommand: async (command, settings) => pushRemoteCommand(command, settings),
   commandsSince: async (cursor) => remoteCommandsSince(cursor),
   challenges: async () => liveChallenges(),
   pushChallenge: async (input) => ({ position: pushChallenge(input).position }),
@@ -103,22 +104,28 @@ class TigerRelay implements Relay {
     return r ? { ...r.status, at: Date.now() - Math.max(0, r.age_ms) } : null;
   }
 
-  async pushCommand(command: RemoteCommandName) {
+  async pushCommand(command: RemoteCommandName, settings?: RemoteCommand["settings"]) {
     const db = await this.db();
-    const { rows } = await db.query<{ id: string; created_at: Date }>(`INSERT INTO remote_commands (command) VALUES ($1) RETURNING id, created_at`, [command]);
+    const { rows } = await db.query<{ id: string; created_at: Date }>(`INSERT INTO remote_commands (command, payload) VALUES ($1, $2) RETURNING id, created_at`, [
+      command,
+      settings ?? null,
+    ]);
     await db.query(`DELETE FROM remote_commands WHERE created_at < now() - INTERVAL '1 hour'`);
-    return { id: Number(rows[0].id), command, at: ms(rows[0].created_at) };
+    return { id: Number(rows[0].id), command, at: ms(rows[0].created_at), ...(settings ? { settings } : {}) };
   }
 
   async commandsSince(cursor: number) {
-    const { rows } = await (await this.db()).query<{ cursor: string; commands: { id: string; command: RemoteCommandName; at: number }[] }>(
+    const { rows } = await (await this.db()).query<{ cursor: string; commands: { id: string; command: RemoteCommandName; at: number; settings: RemoteCommand["settings"] | null }[] }>(
       `SELECT coalesce(max(id), 0) AS cursor,
-              coalesce(json_agg(json_build_object('id', id, 'command', command, 'at', (extract(epoch FROM created_at) * 1000)::bigint) ORDER BY id)
+              coalesce(json_agg(json_build_object('id', id, 'command', command, 'at', (extract(epoch FROM created_at) * 1000)::bigint, 'settings', payload) ORDER BY id)
                 FILTER (WHERE id > $1 AND created_at > now() - make_interval(secs => $2)), '[]') AS commands
        FROM remote_commands`,
       [cursor, COMMAND_TTL_S],
     );
-    return { cursor: Number(rows[0].cursor), commands: rows[0].commands.map((c) => ({ ...c, id: Number(c.id), at: Number(c.at) })) };
+    return {
+      cursor: Number(rows[0].cursor),
+      commands: rows[0].commands.map(({ settings, ...c }) => ({ ...c, id: Number(c.id), at: Number(c.at), ...(settings ? { settings } : {}) })),
+    };
   }
 
   async challenges() {

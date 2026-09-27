@@ -179,6 +179,8 @@ export const TIGER_SCHEMA: readonly string[] = [
     command text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
+  // The "settings" command carries the settings to change (camera, sound) from /admin.
+  `ALTER TABLE remote_commands ADD COLUMN IF NOT EXISTS payload jsonb`,
   `CREATE TABLE IF NOT EXISTS challengers (
     id bigserial PRIMARY KEY,
     name text NOT NULL,

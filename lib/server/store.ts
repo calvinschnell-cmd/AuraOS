@@ -682,10 +682,10 @@ export async function usageSnapshot(): Promise<UsageStats> {
 }
 
 /** Remote control command queue (per server instance; the kiosk polls it). */
-export function pushRemoteCommand(command: RemoteCommand["command"]): RemoteCommand {
+export function pushRemoteCommand(command: RemoteCommand["command"], settings?: RemoteCommand["settings"]): RemoteCommand {
   const r = globals.remote;
   r.cursor += 1;
-  const cmd: RemoteCommand = { id: r.cursor, command, at: Date.now() };
+  const cmd: RemoteCommand = { id: r.cursor, command, at: Date.now(), ...(settings ? { settings } : {}) };
   r.commands.push(cmd);
   if (r.commands.length > 50) r.commands.splice(0, r.commands.length - 50);
   return cmd;

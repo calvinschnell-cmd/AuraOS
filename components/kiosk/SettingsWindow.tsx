@@ -125,6 +125,34 @@ export function SettingsWindow(p: KioskViewProps) {
             />
             MUTED (M)
           </label>
+
+          <label htmlFor="music-volume">MUSIC VOLUME</label>
+          <span className="flex items-center gap-2">
+            <input
+              id="music-volume"
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={settings.musicVolume}
+              onChange={(e) => updateSettings({ musicVolume: Number(e.target.value) })}
+            />
+            <span className="w-10 text-right font-mono text-xs">{Math.round(settings.musicVolume * 100)}%</span>
+          </span>
+
+          <label htmlFor="voice-volume">JUDGE VOICE</label>
+          <span className="flex items-center gap-2">
+            <input
+              id="voice-volume"
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={settings.voiceVolume}
+              onChange={(e) => updateSettings({ voiceVolume: Number(e.target.value) })}
+            />
+            <span className="w-10 text-right font-mono text-xs">{Math.round(settings.voiceVolume * 100)}%</span>
+          </span>
         </div>
         <p className="mt-3 font-mono text-[10px] uppercase opacity-70">
           Camera: {p.camera.status}

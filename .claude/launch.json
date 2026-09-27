@@ -4,28 +4,61 @@
     {
       "name": "aura-os-dev",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
-      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev"],
-      "port": 3000
+      "runtimeArgs": [
+        "C:/Users/calvi/AuraOS/node_modules/next/dist/bin/next",
+        "dev",
+        "C:/Users/calvi/AuraOS"
+      ],
+      "port": 3000,
+      "cwd": "C:/Users/calvi/AuraOS"
+    },
+    {
+      "name": "aura-ml",
+      "runtimeExecutable": "C:/Users/calvi/AuraOS/ml-service/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "C:/Users/calvi/AuraOS/ml-service/server.py"
+      ],
+      "port": 8001,
+      "cwd": "C:/Users/calvi/AuraOS"
     },
     {
       "name": "aura-os-mock",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
-      "runtimeArgs": ["scripts/dev-mock.mjs"],
+      "runtimeArgs": [
+        "scripts/dev-mock.mjs"
+      ],
       "port": 3100
     },
     {
       "name": "aura-os-mobile",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
-      "runtimeArgs": ["scripts/dev-mock.mjs"],
-      "env": { "AURA_DIST_DIR": ".next-mobile", "ADMIN_KEY": "mobile-test-key" },
+      "runtimeArgs": [
+        "scripts/dev-mock.mjs"
+      ],
+      "env": {
+        "AURA_DIST_DIR": ".next-mobile",
+        "ADMIN_KEY": "mobile-test-key"
+      },
       "port": 3300,
       "autoPort": true
     },
     {
       "name": "aura-os-timing",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
-      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "--port", "3400"],
-      "env": { "AURA_DIST_DIR": ".next-mobile", "TIGER_DATABASE_URL": "", "CLASSIFIER_MODE": "skip", "ELEVENLABS_API_KEY": "", "SOLANA_BADGES_ENABLED": "false", "PRINTING_ENABLED": "false" },
+      "runtimeArgs": [
+        "node_modules/next/dist/bin/next",
+        "dev",
+        "--port",
+        "3400"
+      ],
+      "env": {
+        "AURA_DIST_DIR": ".next-mobile",
+        "TIGER_DATABASE_URL": "",
+        "CLASSIFIER_MODE": "skip",
+        "ELEVENLABS_API_KEY": "",
+        "SOLANA_BADGES_ENABLED": "false",
+        "PRINTING_ENABLED": "false"
+      },
       "port": 3400
     }
   ]
