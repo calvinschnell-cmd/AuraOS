@@ -314,11 +314,12 @@ export function legendForState(state: KioskState): GestureId[] {
 
 /**
  * The open palm (raised, held 1.5 s) ends the session from any screen with the
- * quick reboot, except while a photo is being taken: an open hand is a common
- * pose, and the countdown must not throw the shot away.
+ * quick reboot, except: the home screens (spinning, attract, the mode select),
+ * where an open hand is a wave; and while a photo is being taken, where an
+ * open hand is a pose and the countdown must not throw the shot away.
  */
 export function palmReboots(state: KioskState): boolean {
-  return state !== "BOOT" && state !== "COUNTDOWN" && state !== "LOBBY_COUNTDOWN";
+  return !(state === "BOOT" || state === "SPINNING" || state === "ATTRACT" || state === "READY" || state === "COUNTDOWN" || state === "LOBBY_COUNTDOWN");
 }
 
 /** Gestures that do something in the given state (drives what the engine allows). */
@@ -380,12 +381,11 @@ export function gestureEvent(gesture: EngineGesture, state: KioskState): KioskEv
   }
 }
 
-/** Gestures are ignored while analyzing and during the reveal animation. */
 /**
  * No gesture at all: booting, and the photo countdowns. (Locking, charging,
  * analyzing, the battle intro and typing a name only take the open palm:
  * their own gesture lists are empty.)
  */
 export function gesturesIgnored(state: KioskState): boolean {
-  return !palmReboots(state);
+  return state === "BOOT" || state === "COUNTDOWN" || state === "LOBBY_COUNTDOWN";
 }

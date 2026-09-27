@@ -297,9 +297,9 @@ describe("gesture engine", () => {
     path.forEach((x, i) => events.push(...e.update(frame(i * 100, [hand("Open_Palm", x)]), RESULT)));
     expect(events.filter((ev) => ev.type === "wave")).toEqual([]);
   });
-  it("a long wave never fills the open palm (the always-on end session)", () => {
-    // READY takes both the wave and the palm: 3 s of waving must only wave.
-    const READY = allowedGestures(gesturesForState("READY"), true);
+  it("a long wave never fills the open palm (end session)", () => {
+    // No kiosk screen takes both today, but the engine guards it anyway: 3 s of waving must only wave.
+    const READY = new Set<EngineGesture>(["wave", "open_palm"]);
     const e = new GestureEngine();
     const events: GestureEvent[] = [];
     const sweep = [0.3, 0.35, 0.4, 0.45, 0.5, 0.45, 0.4, 0.35];

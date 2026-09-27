@@ -36,11 +36,17 @@ describe("kiosk state machine", () => {
     expect(legendForState("READY")).toEqual(gesturesForState("READY").filter((g) => g !== "wave"));
   });
 
-  it("open palm does the quick reboot from any screen except boot and the photo countdowns", () => {
+  it("open palm does the quick reboot from any screen except boot, the home screens and the photo countdowns", () => {
+    const home = ["SPINNING", "ATTRACT", "READY"];
     for (const state of KIOSK_STATES as readonly KioskState[]) {
-      const blocked = state === "BOOT" || state === "COUNTDOWN" || state === "LOBBY_COUNTDOWN";
+      const blocked = state === "BOOT" || state === "COUNTDOWN" || state === "LOBBY_COUNTDOWN" || home.includes(state);
       expect(transition(state, { type: "OPEN_PALM" })).toBe(blocked ? null : "BOOT");
       expect(gesturesForState(state).includes("open_palm")).toBe(!blocked);
+    }
+    // The home screens still take every other gesture (the wave above all).
+    for (const state of home as KioskState[]) {
+      expect(gesturesIgnored(state)).toBe(false);
+      expect(gesturesForState(state)).toContain("wave");
     }
     // Screens where hands are busy take it but do not advertise it.
     expect(legendForState("ANALYZING")).toEqual([]);
