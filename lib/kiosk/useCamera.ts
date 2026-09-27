@@ -45,11 +45,13 @@ export function useCamera(deviceId: string | null, enabled = true): CameraHandle
       }
       setStatus("requesting");
       try {
+        // 1080p when the camera has it (falls back to what it offers): full-body
+        // captures need the pixels for small pieces like a tie or shoes.
         const constraints: MediaStreamConstraints = {
           audio: false,
           video: deviceId
-            ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-            : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+            ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            : { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 } },
         };
         const s = await navigator.mediaDevices.getUserMedia(constraints);
         if (cancelled) {

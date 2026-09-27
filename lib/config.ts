@@ -105,8 +105,14 @@ export const DAILY_SCAN_CAP: number = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_DAILY_SCAN_CAP;
 })();
 
-/** Capture settings: long side max, JPEG quality (also strips EXIF). */
-export const CAPTURE_MAX_LONG_SIDE = 1024;
+/**
+ * Capture settings: long side max, JPEG quality (also strips EXIF). 1536 keeps
+ * a full-body portrait frame at ~864 px wide, so small pieces (a tie, a collar,
+ * shoes) are real pixels for the judges; OpenAI bills "high" detail by 512 px
+ * tiles after scaling the short side to 768, so this costs no more tokens
+ * than 1024 did.
+ */
+export const CAPTURE_MAX_LONG_SIDE = 1536;
 export const CAPTURE_JPEG_QUALITY = 0.85;
 
 /** Share card dimensions. */
