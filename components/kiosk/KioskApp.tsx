@@ -49,6 +49,8 @@ const SULK_LINE = "The mirror is taking a break. Maybe try a double peace sign i
 const WARMUP_EVERY_MS = 4 * 60 * 1000;
 /** Mirror mode text/window size on top of the TEXT SCALE setting. */
 const MIRROR_TEXT_BOOST = 1.3;
+/** A 1v1 capture may use the last two-person frame when one body drops out at the shutter, if it is this fresh. */
+const PAIR_POSE_MAX_AGE_MS = 2000;
 
 /**
  * The kiosk root. Runs every shared hook once and hands identical props to
@@ -88,14 +90,14 @@ export default function KioskApp({
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [recentSignatures, setRecentSignatures] = useState<string[][]>([]);
   // Live landmarks from the gesture runtime (wired below, once it exists).
-  const livePoses = useRef<() => PoseSnapshot[]>(() => []);
+  const livePoses = useRef<(pair?: boolean) => PoseSnapshot[]>(() => []);
 
   const analyze = useCallback(
     () => analyzeFrame({ video: videoRef.current, flip: settings.flipFeed, rotation: settings.cameraRotation, onUsage: setUsage }),
     [videoRef, settings.flipFeed, settings.cameraRotation],
   );
   const captureLobbyFn = useCallback(
-    (pair: boolean) => captureLobby({ video: videoRef.current, flip: settings.flipFeed, rotation: settings.cameraRotation, onUsage: setUsage, poses: () => livePoses.current() }, pair),
+    (pair: boolean) => captureLobby({ video: videoRef.current, flip: settings.flipFeed, rotation: settings.cameraRotation, onUsage: setUsage, poses: () => livePoses.current(pair) }, pair),
     [videoRef, settings.flipFeed, settings.cameraRotation],
   );
   const scoreCaptureFn = useCallback((capture: Parameters<typeof scoreCapture>[0]) => scoreCapture(capture, setUsage), []);
@@ -188,8 +190,16 @@ export default function KioskApp({
     send: sendWithMeltdown,
   });
   useEffect(() => {
-    livePoses.current = () => gestures.posesRef.current ?? [];
-  }, [gestures.posesRef]);
+    livePoses.current = (pair = false) => {
+      const now = gestures.posesRef.current ?? [];
+      // A 1v1 capture needs both bodies: if one dropped out of the tracker at
+      // the shutter, use the last frame that had both (under 2 s old) rather
+      // than splitting the photo in half and judging one person twice.
+      const last = gestures.lastPairRef.current;
+      if (pair && now.length < 2 && last && Date.now() - last.at < PAIR_POSE_MAX_AGE_MS) return last.poses;
+      return now;
+    };
+  }, [gestures.posesRef, gestures.lastPairRef]);
 
   // Pre-flight: warm the model connection on boot and during idle gaps, so the
   // first battle of the day never pays the cold start.

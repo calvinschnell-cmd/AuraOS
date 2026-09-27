@@ -389,7 +389,9 @@ export const FIGHT_STANCE_POSE: Pose = mergePoses(IDLE_POSE, {
     head: [6, 0, 0],
   },
   root: [0, -0.03, 0],
-  yaw: -65,
+  // Turned toward screen right (positive yaw), i.e. toward an opponent standing to its right;
+  // figures on the right half play the mirrored stance and turn left.
+  yaw: 65,
   hands: { L: FIST, R: FIST },
 });
 
@@ -402,6 +404,12 @@ export const FIGHT_STANCE_ANIM: Animation = {
     { pose: FIGHT_STANCE_POSE, durationMs: 300, easing: "easeInOut" },
     { pose: mergePoses(FIGHT_STANCE_POSE, { root: [0, 0, 0], joints: { elbowR: [-110, 0, -10], spine: [-10, 0, -3] } }), durationMs: 300, easing: "easeInOut" },
   ],
+};
+/** The same stance squared up to the crowd: the middle figure of an odd-sized squad. */
+export const FIGHT_STANCE_FRONT_ANIM: Animation = {
+  ...FIGHT_STANCE_ANIM,
+  name: "fightStanceFront",
+  keyframes: FIGHT_STANCE_ANIM.keyframes.map((k) => ({ ...k, pose: { ...k.pose, yaw: 0 } })),
 };
 export const THINKING_ANIM = holdAnim("thinking", THINKING_POSE, 500);
 export const THUMBS_UP_ANIM: Animation = {

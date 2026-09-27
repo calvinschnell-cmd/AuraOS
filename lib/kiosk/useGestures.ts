@@ -49,6 +49,8 @@ export interface GestureRuntime {
   poseBoxesRef: RefObject<PoseBox[]>;
   /** Latest full landmark sets per person (upright, unmirrored): the pose score at capture time. */
   posesRef: RefObject<PoseSnapshot[]>;
+  /** The last frame that had two or more people, and when (ms epoch): a 1v1 capture falls back to it when a player drops out for a moment. */
+  lastPairRef: RefObject<{ poses: PoseSnapshot[]; at: number } | null>;
   debug: GestureDebug;
 }
 
@@ -123,6 +125,7 @@ export function useGestures(opts: GestureOptions): GestureRuntime {
   const progressRef = useRef<Progress>({ gesture: null, value: 0 });
   const poseBoxesRef = useRef<PoseBox[]>([]);
   const posesRef = useRef<PoseSnapshot[]>([]);
+  const lastPairRef = useRef<{ poses: PoseSnapshot[]; at: number } | null>(null);
   const optsRef = useRef(opts);
   useEffect(() => {
     optsRef.current = opts;
@@ -370,6 +373,7 @@ export function useGestures(opts: GestureOptions): GestureRuntime {
           });
           poseBoxesRef.current = lastBoxes;
           posesRef.current = pr.landmarks.map((lm) => snapshotFromMediapipe(lm, width / height)).filter((p): p is PoseSnapshot => p !== null);
+          if (posesRef.current.length >= 2) lastPairRef.current = { poses: posesRef.current, at: Date.now() };
           lastFraming = assessFraming(pr.landmarks);
         }
       }
@@ -452,5 +456,5 @@ export function useGestures(opts: GestureOptions): GestureRuntime {
     };
   }, [opts.cameraLive]);
 
-  return { status, progressRef, poseBoxesRef, posesRef, debug: { ...debug, status } };
+  return { status, progressRef, poseBoxesRef, posesRef, lastPairRef, debug: { ...debug, status } };
 }

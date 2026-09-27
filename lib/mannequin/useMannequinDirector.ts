@@ -20,6 +20,7 @@ import {
   SULK_ENTER_ANIM,
   SULK_EXIT_ANIM,
   FIGHT_STANCE_ANIM,
+  FIGHT_STANCE_FRONT_ANIM,
   THINKING_ANIM,
   THUMBS_UP_ANIM,
   TYPING_ANIM,
@@ -288,7 +289,8 @@ export function useMannequinDirector(
     const called = r && current.battle && r.battleId === current.battle.id ? revealedSlots(current.battle.players, r.shown) : null;
     for (let i = 0; i < n; i++) {
       let anim: Animation = IDLE_ANIM;
-      if (state === "BATTLE_INTRO") anim = FIGHT_STANCE_ANIM;
+      // Fists up: each side turns to the other; the middle of an odd squad faces the crowd.
+      if (state === "BATTLE_INTRO") anim = n > 1 && n % 2 === 1 && i === (n - 1) / 2 ? FIGHT_STANCE_FRONT_ANIM : FIGHT_STANCE_ANIM;
       else if (state === "BATTLE_RESULT" || state === "CLAIM") {
         const player = current.battle?.players[i];
         anim = current.battle ? resultAnimation(current.battle, player) : THUMBS_UP_ANIM;
