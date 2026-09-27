@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     // Mock-mode dev server build (scripts/dev-mock.mjs).
     ".next-mock/**",
     ".next-demo/**",
+    ".next-mobile/**",
   ]),
 ]);
 

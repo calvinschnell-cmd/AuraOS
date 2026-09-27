@@ -5,18 +5,17 @@ import type { ReactNode } from "react";
 import { historyPath } from "@/lib/players";
 import { useIdentity } from "./Identity";
 
-export type AppTab = "home" | "feed" | "board" | "me";
+export type AppTab = "scan" | "feed" | "board" | "me";
 
 /** 7x7 pixel icons, drawn as rects so they stay crisp at any size. */
 const ICONS: Record<AppTab, [number, number, number, number][]> = {
-  home: [
-    [3, 0, 1, 1],
-    [2, 1, 3, 1],
-    [1, 2, 5, 1],
-    [0, 3, 7, 1],
-    [1, 4, 5, 1],
-    [1, 5, 2, 2],
-    [4, 5, 2, 2],
+  scan: [
+    [2, 0, 3, 1],
+    [0, 1, 7, 1],
+    [0, 2, 1, 4],
+    [6, 2, 1, 4],
+    [2, 3, 3, 2],
+    [0, 6, 7, 1],
   ],
   feed: [
     [0, 0, 2, 2],
@@ -52,7 +51,7 @@ function PixelIcon({ tab }: { tab: AppTab }) {
 
 /**
  * The phone app's frame: a sticky bar on top (live dot, where you are) and a
- * tab bar at the bottom (HOME, FEED, BOARD, ME) with a sliding indicator.
+ * tab bar at the bottom (SCAN, FEED, BOARD, ME) with a sliding indicator.
  * `profileHandle`: on a profile page, ME lights up when it is your own.
  */
 export function AppShell({
@@ -71,7 +70,7 @@ export function AppShell({
   const [player] = useIdentity();
   const active: AppTab | null = profileHandle ? (player && player.handle.toUpperCase() === profileHandle.toUpperCase() ? "me" : null) : tab;
   const items: { tab: AppTab; label: string; href: string }[] = [
-    { tab: "home", label: "HOME", href: "/" },
+    { tab: "scan", label: "SCAN", href: "/scan" },
     { tab: "feed", label: "FEED", href: "/feed" },
     { tab: "board", label: "BOARD", href: "/feed?tab=standings" },
     { tab: "me", label: player ? "ME" : "JOIN", href: player ? historyPath(player.handle) : "/me" },

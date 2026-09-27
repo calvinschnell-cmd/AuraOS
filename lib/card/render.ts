@@ -1,6 +1,6 @@
 "use client";
 
-import { toPng } from "html-to-image";
+import { toJpeg, toPng } from "html-to-image";
 import type { Box2D } from "@/lib/schema";
 
 export const CARD_W = 1080;
@@ -77,6 +77,26 @@ async function settle(node: HTMLElement): Promise<void> {
   await document.fonts?.ready;
   const imgs = Array.from(node.querySelectorAll("img"));
   await Promise.all(imgs.map((img) => (img.complete ? Promise.resolve() : img.decode().catch(() => undefined))));
+}
+
+/**
+ * Phone cards: the same render as a JPEG (a fraction of the PNG's size on
+ * venue wifi). iOS Safari often paints <img>s inside the SVG snapshot only
+ * from the second pass, so the first pass is a throwaway warm-up there.
+ */
+export async function renderCardJpeg(node: HTMLElement, quality = 0.88): Promise<Blob> {
+  await settle(node);
+  const opts = { width: CARD_W, height: CARD_H, pixelRatio: 1, quality, backgroundColor: CARD_BG };
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && navigator.maxTouchPoints > 1);
+  let dataUrl: string;
+  try {
+    if (ios) await toJpeg(node, opts).catch(() => null);
+    dataUrl = await toJpeg(node, opts);
+  } catch {
+    dataUrl = await toJpeg(node, { ...opts, skipFonts: true });
+  }
+  const res = await fetch(dataUrl);
+  return res.blob();
 }
 
 /** Render a mounted card node to a 1080x1350 PNG blob. */

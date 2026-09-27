@@ -1,6 +1,6 @@
 import { rootCertificates, type ConnectionOptions } from "node:tls";
 import { Pool, type PoolClient } from "pg";
-import type { HottestHour, JudgeSplit, LeaderboardEntry, PlayerHistory, PlayerInfo, TimelineBucket } from "@/lib/kiosk/types";
+import type { HottestHour, JudgeSplit, LeaderboardEntry, PlayerHistory, PlayerInfo, ScanSource, TimelineBucket } from "@/lib/kiosk/types";
 import { makeHandle, newHandleCode } from "@/lib/players";
 import type { Analysis } from "@/lib/schema";
 import type { JudgeId, ScoreBreakdown } from "@/lib/scoring";
@@ -64,6 +64,7 @@ interface ScanRow {
   analysis: Analysis;
   breakdown: ScoreBreakdown;
   created_at: Date;
+  source: string;
 }
 
 interface EntryRow {
@@ -74,13 +75,15 @@ interface EntryRow {
   aura: number;
   standout: string | null;
   created_at: Date;
+  source: string;
 }
 
 /** Ids are uuid columns: anything else (a bad URL, a typo) is simply not found instead of a SQL error. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (id: string): boolean => UUID.test(id);
 
-const toScan = (r: ScanRow): StoredScan => ({ id: r.id, imageHash: r.image_hash, aura: r.aura, analysis: r.analysis, breakdown: r.breakdown, createdAt: r.created_at.toISOString() });
+const sourceOf = (v: string | null | undefined): ScanSource => (v === "mobile" ? "mobile" : "mirror");
+const toScan = (r: ScanRow): StoredScan => ({ id: r.id, imageHash: r.image_hash, aura: r.aura, analysis: r.analysis, breakdown: r.breakdown, createdAt: r.created_at.toISOString(), source: sourceOf(r.source) });
 const toEntry = (r: EntryRow): LeaderboardEntry => ({
   id: r.id,
   scanId: r.scan_id,
@@ -89,6 +92,7 @@ const toEntry = (r: EntryRow): LeaderboardEntry => ({
   aura: r.aura,
   standout: r.standout,
   createdAt: r.created_at.toISOString(),
+  source: sourceOf(r.source),
 });
 interface CardRow {
   id: string;
@@ -104,9 +108,12 @@ interface CardRow {
   caption: string | null;
   parent_id: string | null;
   slot: number | null;
+  source: string;
+  device_id: string | null;
+  hidden_at: Date | null;
 }
 
-const CARD_COLS = "id, scan_id, battle_id, nft_signature, created_at, kind, headline, target, title, verdict, caption, parent_id, slot";
+const CARD_COLS = "id, scan_id, battle_id, nft_signature, created_at, kind, headline, target, title, verdict, caption, parent_id, slot, source, device_id, hidden_at";
 const toCard = (r: CardRow): StoredCard => ({
   id: r.id,
   scanId: r.scan_id,
@@ -122,6 +129,9 @@ const toCard = (r: CardRow): StoredCard => ({
   caption: r.caption,
   parentId: r.parent_id,
   slot: r.slot,
+  source: sourceOf(r.source),
+  deviceId: r.device_id,
+  hidden: r.hidden_at !== null,
 });
 
 interface BattleRow {
@@ -131,8 +141,8 @@ interface BattleRow {
   created_at: Date;
 }
 
-const SCAN_COLS = "id, image_hash, aura, analysis, breakdown, created_at";
-const ENTRY_COLS = "id, scan_id, handle, nickname, aura, standout, created_at";
+const SCAN_COLS = "id, image_hash, aura, analysis, breakdown, created_at, source";
+const ENTRY_COLS = "id, scan_id, handle, nickname, aura, standout, created_at, source";
 
 export class TigerStore implements ScanStore {
   readonly kind = "tiger" as const;
@@ -185,8 +195,8 @@ export class TigerStore implements ScanStore {
     const judges = scan.breakdown.judges ?? [];
     await this.tx(async (c) => {
       await c.query(
-        `INSERT INTO scans (id, created_at, image_hash, aura, judge_count, disagree, analysis, breakdown) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [scan.id, scan.createdAt, scan.imageHash, scan.aura, Math.max(1, judges.length), scan.breakdown.disagree ?? false, scan.analysis, scan.breakdown],
+        `INSERT INTO scans (id, created_at, image_hash, aura, judge_count, disagree, analysis, breakdown, source) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [scan.id, scan.createdAt, scan.imageHash, scan.aura, Math.max(1, judges.length), scan.breakdown.disagree ?? false, scan.analysis, scan.breakdown, scan.source ?? "mirror"],
       );
       for (const j of judges) {
         await c.query(
@@ -199,6 +209,14 @@ export class TigerStore implements ScanStore {
   async countToday() {
     const { rows } = await (await this.db()).query<{ n: string }>(`SELECT count(*) AS n FROM scans WHERE created_at >= $1`, [dayStart()]);
     return Number(rows[0].n);
+  }
+  async countTodayBySource(source: ScanSource) {
+    const { rows } = await (await this.db()).query<{ n: string }>(`SELECT count(*) AS n FROM scans WHERE created_at >= $1 AND source = $2`, [dayStart(), source]);
+    return Number(rows[0].n);
+  }
+  async saveRawPhoto(scanId: string, data: Buffer, mimeType: string) {
+    if (!isUuid(scanId)) return;
+    await (await this.db()).query(`INSERT INTO raw_photos (scan_id, mime_type, data) VALUES ($1, $2, $3) ON CONFLICT (scan_id) DO NOTHING`, [scanId, mimeType, data]);
   }
   async rankToday(aura: number) {
     const { rows } = await (await this.db()).query<{ above: string; total: string }>(
@@ -216,11 +234,19 @@ export class TigerStore implements ScanStore {
 
   async insertCard(card: NewCard, png: Buffer) {
     const { rows } = await (await this.db()).query<{ created_at: Date }>(
-      `INSERT INTO cards (id, scan_id, battle_id, png, kind, headline, target, title, verdict, caption, parent_id, slot)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING created_at`,
-      [card.id, card.scanId, card.battleId, png, card.kind, card.headline, card.target, card.title, card.verdict, card.caption, card.parentId, card.slot],
+      `INSERT INTO cards (id, scan_id, battle_id, png, kind, headline, target, title, verdict, caption, parent_id, slot, source, device_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING created_at`,
+      [card.id, card.scanId, card.battleId, png, card.kind, card.headline, card.target, card.title, card.verdict, card.caption, card.parentId, card.slot, card.source ?? "mirror", card.deviceId ?? null],
     );
-    return { ...card, imageUrl: `/api/cards/${card.id}/image`, createdAt: rows[0].created_at.toISOString(), nftSignature: null };
+    return {
+      ...card,
+      source: card.source ?? "mirror",
+      deviceId: card.deviceId ?? null,
+      hidden: false,
+      imageUrl: `/api/cards/${card.id}/image`,
+      createdAt: rows[0].created_at.toISOString(),
+      nftSignature: null,
+    };
   }
   async getCard(id: string) {
     if (!isUuid(id)) return null;
@@ -229,11 +255,33 @@ export class TigerStore implements ScanStore {
   }
   async getCardImage(id: string) {
     if (!isUuid(id)) return null;
-    const { rows } = await (await this.db()).query<{ png: Buffer }>(`SELECT png FROM cards WHERE id = $1`, [id]);
+    const { rows } = await (await this.db()).query<{ png: Buffer }>(`SELECT png FROM cards WHERE id = $1 AND hidden_at IS NULL`, [id]);
     return rows[0]?.png ?? null;
   }
   async setCardNft(id: string, signature: string) {
     await (await this.db()).query(`UPDATE cards SET nft_signature = $2 WHERE id = $1`, [id, signature]);
+  }
+  async setCardDevice(id: string, deviceId: string) {
+    if (!isUuid(id)) return false;
+    const { rowCount } = await (await this.db()).query(`UPDATE cards SET device_id = $2 WHERE id = $1 AND device_id IS NULL`, [id, deviceId]);
+    return (rowCount ?? 0) > 0;
+  }
+  async hideCard(id: string) {
+    if (!isUuid(id)) return false;
+    return this.tx(async (c) => {
+      const { rows } = await c.query<{ scan_id: string | null; battle_id: string | null }>(
+        `UPDATE cards SET hidden_at = coalesce(hidden_at, now()) WHERE id = $1 RETURNING scan_id, battle_id`,
+        [id],
+      );
+      if (!rows[0]) return false;
+      await c.query(`UPDATE cards SET hidden_at = coalesce(hidden_at, now()) WHERE parent_id = $1`, [id]);
+      if (rows[0].scan_id && !rows[0].battle_id) await c.query(`UPDATE leaderboard_entries SET hidden = true WHERE scan_id = $1`, [rows[0].scan_id]);
+      return true;
+    });
+  }
+  async hiddenCardIds(since: string) {
+    const { rows } = await (await this.db()).query<{ id: string }>(`SELECT id FROM cards WHERE hidden_at > $1 ORDER BY hidden_at DESC LIMIT 200`, [since]);
+    return rows.map((r) => r.id);
   }
 
   // ---------------------------------------------------------------- leaderboard
@@ -242,8 +290,8 @@ export class TigerStore implements ScanStore {
     const scan = await this.getById(entry.scanId);
     const standout = scan ? ([...scan.analysis.items].sort((a, b) => b.uniqueness - a.uniqueness)[0]?.name ?? null) : null;
     await (await this.db()).query(
-      `INSERT INTO leaderboard_entries (id, scan_id, handle, nickname, aura, standout) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (scan_id) DO NOTHING`,
-      [entry.id, entry.scanId, entry.handle, entry.nickname, entry.aura, standout],
+      `INSERT INTO leaderboard_entries (id, scan_id, handle, nickname, aura, standout, source, device_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (scan_id) DO NOTHING`,
+      [entry.id, entry.scanId, entry.handle, entry.nickname, entry.aura, standout, entry.source ?? "mirror", entry.deviceId ?? null],
     );
   }
   async entryForScan(scanId: string) {
@@ -252,11 +300,26 @@ export class TigerStore implements ScanStore {
     return rows[0] ? toEntry(rows[0]) : null;
   }
   async leaderboard(limit: number) {
-    const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries ORDER BY aura DESC, created_at ASC LIMIT $1`, [limit]);
+    const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden ORDER BY aura DESC, created_at ASC LIMIT $1`, [limit]);
     return rows.map(toEntry);
   }
+  async viewerBest(deviceId: string | null, handle: string | null) {
+    if (!deviceId && !handle) return null;
+    const db = await this.db();
+    const { rows } = await db.query<EntryRow>(
+      `SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden AND (device_id = $1 OR handle = $2) ORDER BY aura DESC, created_at ASC LIMIT 1`,
+      [deviceId, handle?.toUpperCase() ?? null],
+    );
+    const best = rows[0];
+    if (!best) return null;
+    const { rows: r } = await db.query<{ n: string }>(
+      `SELECT count(*) AS n FROM leaderboard_entries WHERE NOT hidden AND (aura > $1 OR (aura = $1 AND created_at < $2))`,
+      [best.aura, best.created_at],
+    );
+    return { entry: toEntry(best), rank: Number(r[0].n) + 1 };
+  }
   async recentEntries(limit: number) {
-    const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries ORDER BY created_at DESC LIMIT $1`, [limit]);
+    const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden ORDER BY created_at DESC LIMIT $1`, [limit]);
     return rows.map(toEntry);
   }
   async cardIdsForScans(scanIds: string[]) {
@@ -359,7 +422,7 @@ export class TigerStore implements ScanStore {
   }
   async feed(limit: number, before?: string | null, since?: string | null) {
     const { rows } = await (await this.db()).query<CardRow>(
-      `SELECT ${CARD_COLS} FROM cards WHERE parent_id IS NULL AND ($2::timestamptz IS NULL OR created_at < $2) AND ($3::timestamptz IS NULL OR created_at > $3) ORDER BY created_at DESC LIMIT $1`,
+      `SELECT ${CARD_COLS} FROM cards WHERE parent_id IS NULL AND hidden_at IS NULL AND ($2::timestamptz IS NULL OR created_at < $2) AND ($3::timestamptz IS NULL OR created_at > $3) ORDER BY created_at DESC LIMIT $1`,
       [limit, before ?? null, since ?? null],
     );
     return this.toFeed(rows);
@@ -367,9 +430,10 @@ export class TigerStore implements ScanStore {
   async cardsForHandle(handle: string, limit: number) {
     const { rows } = await (await this.db()).query<CardRow>(
       `SELECT ${CARD_COLS} FROM cards
-        WHERE (parent_id IS NULL AND battle_id IS NULL AND scan_id IN (SELECT scan_id FROM leaderboard_entries WHERE handle = $1))
+        WHERE hidden_at IS NULL AND (
+              (parent_id IS NULL AND battle_id IS NULL AND scan_id IN (SELECT scan_id FROM leaderboard_entries WHERE handle = $1))
            OR (parent_id IS NULL AND battle_id IN (SELECT battle_id FROM battle_players WHERE handle = $1))
-           OR (parent_id IS NOT NULL AND scan_id IN (SELECT scan_id FROM battle_players WHERE handle = $1))
+           OR (parent_id IS NOT NULL AND scan_id IN (SELECT scan_id FROM battle_players WHERE handle = $1)))
         ORDER BY created_at DESC LIMIT $2`,
       [handle.toUpperCase(), limit],
     );
@@ -377,12 +441,12 @@ export class TigerStore implements ScanStore {
   }
   async feedEntry(cardId: string) {
     if (!isUuid(cardId)) return null;
-    const { rows } = await (await this.db()).query<CardRow>(`SELECT ${CARD_COLS} FROM cards WHERE id = $1`, [cardId]);
+    const { rows } = await (await this.db()).query<CardRow>(`SELECT ${CARD_COLS} FROM cards WHERE id = $1 AND hidden_at IS NULL`, [cardId]);
     return (await this.toFeed(rows))[0] ?? null;
   }
   async childCards(parentId: string) {
     if (!isUuid(parentId)) return [];
-    const { rows } = await (await this.db()).query<CardRow>(`SELECT ${CARD_COLS} FROM cards WHERE parent_id = $1 ORDER BY slot`, [parentId]);
+    const { rows } = await (await this.db()).query<CardRow>(`SELECT ${CARD_COLS} FROM cards WHERE parent_id = $1 AND hidden_at IS NULL ORDER BY slot`, [parentId]);
     return this.toFeed(rows);
   }
   async react(cardId: string, emoji: string, clientId: string) {
@@ -398,7 +462,7 @@ export class TigerStore implements ScanStore {
   }
   async entriesForHandles(handles: string[]) {
     if (handles.length === 0) return [];
-    const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE handle = ANY($1::text[]) ORDER BY created_at ASC`, [handles]);
+    const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden AND handle = ANY($1::text[]) ORDER BY created_at ASC`, [handles]);
     return rows.map(toEntry);
   }
   async recentFitSignatures(limit: number) {

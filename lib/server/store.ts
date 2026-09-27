@@ -1,7 +1,7 @@
 import type { TokenUsage } from "@/lib/analyze";
 import { DAILY_SCAN_CAP, OPENAI_INPUT_USD_PER_M, OPENAI_MODEL, OPENAI_OUTPUT_USD_PER_M } from "@/lib/config";
 import { isMockMode } from "@/lib/env";
-import type { HottestHour, JudgeSplit, LeaderboardEntry, PlayerHistory, PlayerInfo, RemoteCommand, StoreKind, TimelineBucket, UsageStats } from "@/lib/kiosk/types";
+import type { HottestHour, JudgeSplit, LeaderboardEntry, PlayerHistory, PlayerInfo, RemoteCommand, ScanSource, StoreKind, TimelineBucket, UsageStats } from "@/lib/kiosk/types";
 import type { KioskStatus } from "@/lib/kiosk/status";
 import { makeHandle, newHandleCode } from "@/lib/players";
 import type { Analysis } from "@/lib/schema";
@@ -26,6 +26,8 @@ export interface StoredScan {
   breakdown: ScoreBreakdown;
   aura: number;
   createdAt: string;
+  /** Mirror or phone (/scan). Absent on older scans: mirror. */
+  source?: ScanSource;
 }
 
 export interface StoredCard {
@@ -47,9 +49,14 @@ export interface StoredCard {
   /** Squad member cards point at the squad card (and stay out of the feed). */
   parentId: string | null;
   slot: number | null;
+  source: ScanSource;
+  /** The phone that made it (or claimed it): only it may start a challenge from it. Never sent to clients. */
+  deviceId: string | null;
+  /** Removed by an admin: gone from the feed, the board and its page. */
+  hidden: boolean;
 }
 
-export type NewCard = Omit<StoredCard, "imageUrl" | "createdAt" | "nftSignature">;
+export type NewCard = Omit<StoredCard, "imageUrl" | "createdAt" | "nftSignature" | "source" | "deviceId" | "hidden"> & { source?: ScanSource; deviceId?: string | null };
 
 /** Battles are stored as their outcome (no images). */
 export type StoredBattle = BattleRecord;
@@ -65,6 +72,14 @@ export interface NewLeaderboardEntry {
   nickname: string;
   aura: number;
   handle: string | null;
+  source?: ScanSource;
+  deviceId?: string | null;
+}
+
+/** The viewer's own best leaderboard entry and its rank (1-based, among visible entries). */
+export interface ViewerBest {
+  entry: LeaderboardEntry;
+  rank: number;
 }
 
 /** Feed row for a card (reactions filled in by the store). */
@@ -82,6 +97,7 @@ export function feedEntryOf(card: StoredCard, reactions: Record<string, number>)
     scanId: card.scanId,
     battleId: card.battleId,
     slot: card.slot,
+    source: card.source,
     reactions,
   };
 }
@@ -99,7 +115,11 @@ export interface ScanStore {
   getById(id: string): Promise<StoredScan | null>;
   insert(scan: StoredScan): Promise<void>;
   countToday(): Promise<number>;
+  /** Today's scans from one source (phone scans have their own share of the cap). */
+  countTodayBySource(source: ScanSource): Promise<number>;
   rankToday(aura: number): Promise<Rank>;
+  /** Only with STORE_RAW_PHOTOS=true (off by default): the EXIF-stripped upload. */
+  saveRawPhoto(scanId: string, data: Buffer, mimeType: string): Promise<void>;
   /** Today's specialness ratings from one judge (adaptive scoring cutoff). */
   specialnessToday(judge: JudgeId): Promise<number[]>;
 
@@ -108,8 +128,19 @@ export interface ScanStore {
   /** The PNG bytes served by /api/cards/[id]/image. */
   getCardImage(id: string): Promise<Buffer | null>;
   setCardNft(id: string, signature: string): Promise<void>;
+  /** Tie a card to a phone ("this was me" on a mirror card), only when it has none. */
+  setCardDevice(id: string, deviceId: string): Promise<boolean>;
+  /**
+   * Admin removal: hides the card (and its squad member cards) from the feed
+   * and its page, and the solo scan's leaderboard entry from the board.
+   */
+  hideCard(id: string): Promise<boolean>;
+  /** Cards hidden after this time (open pages drop them on their next poll). */
+  hiddenCardIds(since: string): Promise<string[]>;
 
   insertLeaderboard(entry: NewLeaderboardEntry): Promise<void>;
+  /** The viewer's best visible entry (their phone's scans, or their AURA ID) and its rank. */
+  viewerBest(deviceId: string | null, handle: string | null): Promise<ViewerBest | null>;
   entryForScan(scanId: string): Promise<LeaderboardEntry | null>;
   leaderboard(limit: number): Promise<LeaderboardEntry[]>;
   recentEntries(limit: number): Promise<LeaderboardEntry[]>;
@@ -207,12 +238,24 @@ interface MemoryState {
   scans: StoredScan[];
   cards: StoredCard[];
   cardImages: Map<string, Buffer>;
-  entries: LeaderboardEntry[];
+  entries: MemoryEntry[];
   battles: StoredBattle[];
   fits: { signature: string[]; seed: string; createdAt: string }[];
   players: Map<string, PlayerInfo>;
   /** cardId -> emoji -> client ids */
   reactions: Map<string, Map<string, Set<string>>>;
+  /** cardId -> when an admin hid it. */
+  hiddenAt: Map<string, string>;
+  rawPhotos: Map<string, { data: Buffer; mimeType: string }>;
+}
+
+type MemoryEntry = LeaderboardEntry & { deviceId?: string | null; hidden?: boolean };
+
+/** What leaves the store: no device ids, no hidden flag. */
+function publicEntry(e: MemoryEntry): LeaderboardEntry {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { deviceId, hidden, ...rest } = e;
+  return { ...rest, source: rest.source ?? "mirror" };
 }
 
 export class MemoryStore implements ScanStore {
@@ -236,6 +279,9 @@ export class MemoryStore implements ScanStore {
   async countToday() {
     return this.today().length;
   }
+  async countTodayBySource(source: ScanSource) {
+    return this.today().filter((x) => (x.source ?? "mirror") === source).length;
+  }
   async specialnessToday(judge: JudgeId) {
     return this.today().flatMap((x) => x.breakdown.judges?.filter((j) => j.judge === judge).map((j) => j.specialness) ?? []);
   }
@@ -243,9 +289,21 @@ export class MemoryStore implements ScanStore {
     const today = this.today();
     return { position: today.filter((x) => x.aura > aura).length + 1, total: Math.max(1, today.length) };
   }
+  async saveRawPhoto(scanId: string, data: Buffer, mimeType: string) {
+    this.s.rawPhotos.set(scanId, { data, mimeType });
+    if (this.s.rawPhotos.size > 200) this.s.rawPhotos.delete(this.s.rawPhotos.keys().next().value!);
+  }
 
   async insertCard(card: NewCard, png: Buffer) {
-    const stored: StoredCard = { ...card, imageUrl: `/api/cards/${card.id}/image`, createdAt: new Date().toISOString(), nftSignature: null };
+    const stored: StoredCard = {
+      ...card,
+      source: card.source ?? "mirror",
+      deviceId: card.deviceId ?? null,
+      hidden: false,
+      imageUrl: `/api/cards/${card.id}/image`,
+      createdAt: new Date().toISOString(),
+      nftSignature: null,
+    };
     this.s.cards.push(stored);
     this.s.cardImages.set(card.id, png);
     if (this.s.cardImages.size > 300) {
@@ -258,25 +316,68 @@ export class MemoryStore implements ScanStore {
     return this.s.cards.find((c) => c.id === id) ?? null;
   }
   async getCardImage(id: string) {
+    if (this.s.cards.find((c) => c.id === id)?.hidden) return null;
     return this.s.cardImages.get(id) ?? null;
   }
   async setCardNft(id: string, signature: string) {
     const card = this.s.cards.find((c) => c.id === id);
     if (card) card.nftSignature = signature;
   }
+  async setCardDevice(id: string, deviceId: string) {
+    const card = this.s.cards.find((c) => c.id === id);
+    if (!card || card.deviceId) return false;
+    card.deviceId = deviceId;
+    return true;
+  }
+  async hideCard(id: string) {
+    const card = this.s.cards.find((c) => c.id === id);
+    if (!card) return false;
+    const at = new Date().toISOString();
+    for (const c of this.s.cards) {
+      if (c.id !== id && c.parentId !== id) continue;
+      c.hidden = true;
+      this.s.hiddenAt.set(c.id, at);
+    }
+    if (card.scanId && !card.battleId) for (const e of this.s.entries) if (e.scanId === card.scanId) e.hidden = true;
+    return true;
+  }
+  async hiddenCardIds(since: string) {
+    return [...this.s.hiddenAt].filter(([, at]) => at > since).map(([id]) => id);
+  }
 
   async insertLeaderboard(entry: NewLeaderboardEntry) {
     const scan = await this.getById(entry.scanId);
-    this.s.entries.push({ ...entry, createdAt: new Date().toISOString(), standout: scan ? standoutItem(scan.analysis) : null });
+    if (this.s.entries.some((e) => e.scanId === entry.scanId)) return;
+    this.s.entries.push({
+      ...entry,
+      source: entry.source ?? "mirror",
+      deviceId: entry.deviceId ?? null,
+      createdAt: new Date().toISOString(),
+      standout: scan ? standoutItem(scan.analysis) : null,
+    });
   }
   async entryForScan(scanId: string) {
-    return this.s.entries.find((e) => e.scanId === scanId) ?? null;
+    const e = this.s.entries.find((x) => x.scanId === scanId);
+    return e ? publicEntry(e) : null;
+  }
+  private ranked(): MemoryEntry[] {
+    return this.s.entries.filter((e) => !e.hidden).sort((a, b) => b.aura - a.aura || a.createdAt.localeCompare(b.createdAt));
   }
   async leaderboard(limit: number) {
-    return [...this.s.entries].sort((a, b) => b.aura - a.aura || a.createdAt.localeCompare(b.createdAt)).slice(0, limit);
+    return this.ranked().slice(0, limit).map(publicEntry);
+  }
+  async viewerBest(deviceId: string | null, handle: string | null) {
+    const h = handle?.toUpperCase() ?? null;
+    const ranked = this.ranked();
+    const i = ranked.findIndex((e) => (deviceId !== null && e.deviceId === deviceId) || (h !== null && e.handle === h));
+    return i < 0 ? null : { entry: publicEntry(ranked[i]), rank: i + 1 };
   }
   async recentEntries(limit: number) {
-    return [...this.s.entries].reverse().slice(0, limit);
+    return [...this.s.entries]
+      .filter((e) => !e.hidden)
+      .reverse()
+      .slice(0, limit)
+      .map(publicEntry);
   }
   async cardIdsForScans(scanIds: string[]) {
     const out: Record<string, string> = {};
@@ -329,7 +430,7 @@ export class MemoryStore implements ScanStore {
   }
   async feed(limit: number, before?: string | null, since?: string | null) {
     return this.s.cards
-      .filter((c) => c.parentId === null && (!before || c.createdAt < before) && (!since || c.createdAt > since))
+      .filter((c) => c.parentId === null && !c.hidden && (!before || c.createdAt < before) && (!since || c.createdAt > since))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit)
       .map((c) => feedEntryOf(c, this.counts(c.id)));
@@ -341,6 +442,7 @@ export class MemoryStore implements ScanStore {
     const battleIds = new Set(claimed.map((c) => c.battleId));
     const memberScans = new Set(claimed.map((c) => c.scanId));
     return this.s.cards
+      .filter((c) => !c.hidden)
       .filter((c) =>
         c.parentId === null
           ? (c.battleId === null && c.scanId !== null && soloScans.has(c.scanId)) || (c.battleId !== null && battleIds.has(c.battleId))
@@ -351,12 +453,12 @@ export class MemoryStore implements ScanStore {
       .map((c) => feedEntryOf(c, this.counts(c.id)));
   }
   async feedEntry(cardId: string) {
-    const c = this.s.cards.find((x) => x.id === cardId);
+    const c = this.s.cards.find((x) => x.id === cardId && !x.hidden);
     return c ? feedEntryOf(c, this.counts(c.id)) : null;
   }
   async childCards(parentId: string) {
     return this.s.cards
-      .filter((c) => c.parentId === parentId)
+      .filter((c) => c.parentId === parentId && !c.hidden)
       .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
       .map((c) => feedEntryOf(c, this.counts(c.id)));
   }
@@ -376,7 +478,10 @@ export class MemoryStore implements ScanStore {
   }
   async entriesForHandles(handles: string[]) {
     const set = new Set(handles);
-    return this.s.entries.filter((e) => e.handle !== null && set.has(e.handle)).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return this.s.entries
+      .filter((e) => !e.hidden && e.handle !== null && set.has(e.handle))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map(publicEntry);
   }
 
   async recentFitSignatures(limit: number) {
@@ -449,7 +554,7 @@ interface Globals {
 
 const g = globalThis as unknown as { __auraServer?: Globals };
 g.__auraServer ??= {
-  memory: { scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map() },
+  memory: { scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map(), hiddenAt: new Map(), rawPhotos: new Map() },
   usage: freshUsage(),
   remote: { cursor: 0, commands: [] },
   challenges: [],
@@ -463,6 +568,14 @@ globals.memory.battles ??= [];
 globals.memory.fits ??= [];
 globals.memory.players ??= new Map();
 globals.memory.reactions ??= new Map();
+globals.memory.hiddenAt ??= new Map();
+globals.memory.rawPhotos ??= new Map();
+// Cards from before phone scans: mirror, no device, visible.
+for (const c of globals.memory.cards) {
+  c.source ??= "mirror";
+  c.deviceId ??= null;
+  c.hidden ??= false;
+}
 // Battles and cards from before N-player battles lack the new fields: drop them (dev memory only).
 globals.memory.battles = globals.memory.battles.filter((b) => Array.isArray((b as Partial<StoredBattle>).players));
 globals.memory.cards = globals.memory.cards.filter((c) => typeof (c as Partial<StoredCard>).kind === "string");

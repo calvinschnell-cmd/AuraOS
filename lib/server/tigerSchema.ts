@@ -109,6 +109,25 @@ export const TIGER_SCHEMA: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS cards_feed_idx ON cards (created_at DESC) WHERE parent_id IS NULL`,
   `CREATE INDEX IF NOT EXISTS cards_parent_idx ON cards (parent_id)`,
 
+  // Phone companion (/scan): where each scan / card / entry came from, the phone that made it
+  // (only it may start a challenge; never sent to clients), and admin removals.
+  `ALTER TABLE scans ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mirror'`,
+  `ALTER TABLE cards ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mirror'`,
+  `ALTER TABLE cards ADD COLUMN IF NOT EXISTS device_id text`,
+  `ALTER TABLE cards ADD COLUMN IF NOT EXISTS hidden_at timestamptz`,
+  `ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mirror'`,
+  `ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS device_id text`,
+  `ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false`,
+  `CREATE INDEX IF NOT EXISTS leaderboard_entries_device_idx ON leaderboard_entries (device_id) WHERE device_id IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS cards_hidden_idx ON cards (hidden_at) WHERE hidden_at IS NOT NULL`,
+  // Only written with STORE_RAW_PHOTOS=true (off by default): the EXIF-stripped upload.
+  `CREATE TABLE IF NOT EXISTS raw_photos (
+    scan_id uuid PRIMARY KEY,
+    mime_type text NOT NULL,
+    data bytea NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+
   `CREATE TABLE IF NOT EXISTS reactions (
     card_id uuid NOT NULL,
     emoji text NOT NULL,

@@ -49,7 +49,7 @@ describe("time series (memory stand-in for the Tiger continuous aggregate)", () 
   });
 
   it("keeps a player's history in order across scans", async () => {
-    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map() });
+    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map(), hiddenAt: new Map(), rawPhotos: new Map() });
     const player = await store.createPlayer("Calvin");
     expect(player.handle).toMatch(/^CALVIN#[A-Z2-9]{4}$/);
     expect(await store.getPlayer(player.handle)).toEqual(player);

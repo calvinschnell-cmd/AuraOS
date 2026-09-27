@@ -46,16 +46,53 @@ export const OPENAI_INPUT_USD_PER_M: number = Number.parseFloat(process.env.OPEN
 export const OPENAI_OUTPUT_USD_PER_M: number = Number.parseFloat(process.env.OPENAI_OUTPUT_USD_PER_M ?? "") || 0.6;
 
 /**
- * Local garment segmentation sidecar (ml-service/, segformer on CUDA).
- * Set ML_SERVICE_URL=off to skip it; analysis also falls back to image-only
- * scoring when the sidecar is unreachable.
+ * Local garment segmentation sidecar (ml-service/, segformer on CUDA): see
+ * classifierConfig. ML_SERVICE_URL=off skips it in local mode; analysis also
+ * falls back to image-only scoring when the sidecar is unreachable.
  */
-export const ML_SERVICE_URL: string | null = (() => {
-  const v = process.env.ML_SERVICE_URL?.trim();
-  if (v?.toLowerCase() === "off") return null;
-  return (v || "http://127.0.0.1:8001").replace(/\/+$/, "");
-})();
 export const ML_SERVICE_TIMEOUT_MS = 4000;
+
+export type ClassifierMode = "local" | "remote" | "skip";
+
+/**
+ * Where the garment classifier (the segmenter sidecar) runs, read per call so
+ * tests and env reloads apply. CLASSIFIER_MODE=local (default): ML_SERVICE_URL
+ * or 127.0.0.1:8001 (the kiosk laptop's GPU). remote: CLASSIFIER_URL (a
+ * tunnel to the laptop). skip: never called (the public server has no GPU).
+ * A down or slow classifier never fails a scan: it is skipped and logged.
+ */
+export function classifierConfig(env: Record<string, string | undefined> = process.env): { mode: ClassifierMode; url: string | null; timeoutMs: number } {
+  const raw = env.CLASSIFIER_MODE?.trim().toLowerCase();
+  const mode: ClassifierMode = raw === "remote" || raw === "skip" ? raw : "local";
+  const timeout = Number.parseInt(env.CLASSIFIER_TIMEOUT_MS ?? "", 10);
+  const timeoutMs = Number.isFinite(timeout) && timeout > 0 ? timeout : ML_SERVICE_TIMEOUT_MS;
+  if (mode === "skip") return { mode, url: null, timeoutMs };
+  if (mode === "remote") {
+    const url = env.CLASSIFIER_URL?.trim();
+    return { mode, url: url ? url.replace(/\/+$/, "") : null, timeoutMs };
+  }
+  const v = env.ML_SERVICE_URL?.trim();
+  return { mode, url: v?.toLowerCase() === "off" ? null : (v || "http://127.0.0.1:8001").replace(/\/+$/, ""), timeoutMs };
+}
+
+/** Phone scans (POST /api/scan/quick): uploads, rate limits and their share of the daily cap. */
+export function mobileScanConfig(env: Record<string, string | undefined> = process.env) {
+  const int = (key: string, fallback: number) => {
+    const n = Number.parseInt(env[key] ?? "", 10);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
+  return {
+    maxUploadBytes: int("SCAN_MAX_UPLOAD_BYTES", 5 * 1024 * 1024),
+    /** Per phone (device id). */
+    perDevice: int("SCAN_RATE_LIMIT", 5),
+    /** Per IP, looser: the whole venue shares one wifi IP. */
+    perIp: int("SCAN_RATE_LIMIT_IP", 30),
+    windowMs: int("SCAN_RATE_WINDOW_MIN", 10) * 60_000,
+    /** Phone scans stop here so the mirror always keeps the rest of DAILY_SCAN_CAP. */
+    dailyCap: int("MOBILE_DAILY_SCAN_CAP", 400),
+    storeRawPhotos: env.STORE_RAW_PHOTOS?.trim().toLowerCase() === "true",
+  };
+}
 
 /** "Today" for caps and ranks is measured in this timezone. */
 export const KIOSK_TIMEZONE: string = process.env.KIOSK_TIMEZONE?.trim() || "America/New_York";

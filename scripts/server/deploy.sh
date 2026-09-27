@@ -29,8 +29,8 @@ remote "DOMAIN='$DOMAIN' PUBLIC_HOST='$PUBLIC_HOST' FALLBACK='$FALLBACK' bash -s
 set -euo pipefail
 cd /opt/aura/next
 # Server-side env: public links on the domain; no GPU segmenter, no printer here.
-sed -i -E '/^(PUBLIC_BASE_URL|ML_SERVICE_URL|PRINTING_ENABLED)=/d' .env.local
-printf 'PUBLIC_BASE_URL=https://%s\nML_SERVICE_URL=\nPRINTING_ENABLED=false\n' "$PUBLIC_HOST" >> .env.local
+sed -i -E '/^(PUBLIC_BASE_URL|ML_SERVICE_URL|CLASSIFIER_MODE|PRINTING_ENABLED)=/d' .env.local
+printf 'PUBLIC_BASE_URL=https://%s\nML_SERVICE_URL=off\nCLASSIFIER_MODE=skip\nPRINTING_ENABLED=false\n' "$PUBLIC_HOST" >> .env.local
 chmod 600 .env.local
 chown -R aura:aura /opt/aura/next
 

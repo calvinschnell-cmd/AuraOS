@@ -4,6 +4,7 @@ import type { CardResponse } from "@/lib/kiosk/types";
 import { checkPlayerName, cleanNickname } from "@/lib/profanity";
 import type { CardKind } from "@/lib/share/caption";
 import { publicBaseUrl } from "@/lib/server/baseUrl";
+import { deviceIdFrom } from "@/lib/server/rateLimit";
 import { getScanStore, type NewCard } from "@/lib/server/store";
 import { isUuid } from "@/lib/server/tigerStore";
 
@@ -61,6 +62,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     const battle = battleId ? await store.getBattle(battleId) : null;
     if (battleId && !battle) return NextResponse.json({ error: "UNKNOWN BATTLE." }, { status: 404 });
     const id = requestedId ?? randomUUID();
+    // Phone scans carry their source on the scan itself; the phone that posts the card owns it.
+    const source = scan?.source ?? "mirror";
+    const deviceId = source === "mobile" ? deviceIdFrom(request.headers.get("x-device-id") ?? String(form.get("device") ?? "")) : null;
     if (await store.getCard(id)) return NextResponse.json({ error: "CARD ALREADY SAVED." }, { status: 409 });
 
     const slotRaw = form.get("slot");
@@ -77,6 +81,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       caption: text(form, "caption", 240),
       parentId,
       slot,
+      source,
+      deviceId,
     };
     const saved = await store.insertCard(card, png);
 
@@ -90,8 +96,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         // Only a registered handle links the scan to a history (see /api/players).
         const handle = handleInput ? ((await store.getPlayer(handleInput).catch(() => null))?.handle ?? null) : null;
         const entryId = randomUUID();
-        await store.insertLeaderboard({ id: entryId, scanId: scan.id, nickname, aura: scan.aura, handle });
-        entry = (await store.entryForScan(scan.id)) ?? { id: entryId, scanId: scan.id, nickname, aura: scan.aura, createdAt: new Date().toISOString(), standout: null, handle };
+        await store.insertLeaderboard({ id: entryId, scanId: scan.id, nickname, aura: scan.aura, handle, source, deviceId });
+        entry = (await store.entryForScan(scan.id)) ?? { id: entryId, scanId: scan.id, nickname, aura: scan.aura, createdAt: new Date().toISOString(), standout: null, handle, source };
       }
     }
     // A battle card puts every player on the board (their total: fit + pose), once per scan.

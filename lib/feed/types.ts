@@ -1,4 +1,5 @@
 import type { BattleRecord } from "@/lib/battle/types";
+import type { ScanSource } from "@/lib/kiosk/types";
 import type { CardKind } from "@/lib/share/caption";
 
 /**
@@ -33,6 +34,8 @@ export interface FeedEntry {
   battleId: string | null;
   /** Squad: which player this per-person card belongs to. */
   slot: number | null;
+  /** Mirror or phone. */
+  source: ScanSource;
   reactions: Record<string, number>;
 }
 

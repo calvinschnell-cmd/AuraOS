@@ -4,14 +4,16 @@ import { DAILY_SCAN_CAP } from "@/lib/config";
 import { analysisFromGemini, geminiJudgeInput, getGeminiJudge, type GeminiVerdict } from "@/lib/judges/gemini";
 import type { Analysis } from "@/lib/schema";
 import { adaptiveCutoff, gptJudge, scoreScan, type JudgeId, type JudgeInput } from "@/lib/scoring";
-import { segmentGarments } from "./segmenter";
+import type { ScanSource } from "@/lib/kiosk/types";
+import { classifyGarments, type ClassifierStatus } from "./segmenter";
 import { getScanStore, recordUsage, type Rank, type StoredScan } from "./store";
 
 export const CAP_MESSAGE = "DAILY SCAN CAP REACHED. THE AURA DEPARTMENT IS CLOSED FOR TODAY.";
+export const MOBILE_CAP_MESSAGE = "PHONE SCANS ARE DONE FOR TODAY. THE MIRROR IS STILL OPEN AT THE BOOTH.";
 
 export class CapError extends Error {
-  constructor() {
-    super(CAP_MESSAGE);
+  constructor(message = CAP_MESSAGE) {
+    super(message);
     this.name = "CapError";
   }
 }
@@ -21,6 +23,8 @@ export interface ProcessedScan {
   rank: Rank;
   cached: boolean;
   mock: boolean;
+  /** The garment classifier stage: null when it never ran (mock mode, cached scan). */
+  classifier: ClassifierStatus | null;
 }
 
 export function sha256(data: Buffer): string {
@@ -40,6 +44,10 @@ export interface ProcessOptions {
    * consensus mid-battle, and it halves concurrent calls per battle (squads).
    */
   singleJudge?: boolean;
+  /** Where the scan was taken (default mirror). */
+  source?: ScanSource;
+  /** Phone scans: their own share of the daily cap (the mirror keeps the rest). */
+  sourceCap?: number;
 }
 
 export async function processScan(data: Buffer, mimeType: string, opts: ProcessOptions = {}): Promise<ProcessedScan> {
@@ -52,7 +60,7 @@ export async function processScan(data: Buffer, mimeType: string, opts: ProcessO
     if (existing) {
       const rank = await store.rankToday(existing.aura);
       // Without a key every stored scan is a fixture: keep the mock banner on cache hits too.
-      return { scan: existing, rank, cached: true, mock: provider.name === "mock" };
+      return { scan: existing, rank, cached: true, mock: provider.name === "mock", classifier: null };
     }
   } catch (err) {
     console.error("[aura] store lookup failed", err);
@@ -61,11 +69,16 @@ export async function processScan(data: Buffer, mimeType: string, opts: ProcessO
   if (provider.name === "openai") {
     const today = await store.countToday().catch(() => 0);
     if (today >= DAILY_SCAN_CAP) throw new CapError();
+    if (opts.source && opts.sourceCap !== undefined) {
+      const fromSource = await store.countTodayBySource(opts.source).catch(() => 0);
+      if (fromSource >= opts.sourceCap) throw new CapError(MOBILE_CAP_MESSAGE);
+    }
   }
 
   const image = { data, mimeType, hash };
   // Stage 1 once, shared by both judges (mock mode never calls the sidecar).
-  const seg = provider.name === "openai" ? await segmentGarments(data, mimeType) : null;
+  const classified = provider.name === "openai" ? await classifyGarments(data, mimeType) : null;
+  const seg = classified?.seg ?? null;
   const gemini = opts.singleJudge ? null : getGeminiJudge();
   const [gptOutcome, geminiOutcome] = await Promise.allSettled([
     provider.analyze(image, { seg }),
@@ -100,6 +113,7 @@ export async function processScan(data: Buffer, mimeType: string, opts: ProcessO
     breakdown,
     aura: breakdown.aura,
     createdAt: new Date().toISOString(),
+    source: opts.source ?? "mirror",
   };
   try {
     await store.insert(scan);
@@ -107,7 +121,7 @@ export async function processScan(data: Buffer, mimeType: string, opts: ProcessO
     console.error("[aura] store insert failed", err);
   }
   const rank = await store.rankToday(scan.aura).catch(() => ({ position: 1, total: 1 }));
-  return { scan, rank, cached: false, mock: provider.name === "mock" };
+  return { scan, rank, cached: false, mock: provider.name === "mock", classifier: classified?.status ?? null };
 }
 
 export function errorResponse(err: unknown): { status: number; body: { error: string; code?: string } } {

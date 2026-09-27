@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ML_SERVICE_TIMEOUT_MS, ML_SERVICE_URL } from "@/lib/config";
+import { classifierConfig } from "@/lib/config";
 import { nameColor, readPalette } from "@/lib/palette";
 import { box2dSchema, type Analysis, type Box2D } from "@/lib/schema";
 
@@ -32,22 +32,36 @@ export type Segmentation = z.infer<typeof segmentationSchema>;
 
 /** POST the image to the sidecar. Null when disabled, down, slow or malformed. */
 export async function segmentGarments(data: Buffer, mimeType: string): Promise<Segmentation | null> {
-  if (!ML_SERVICE_URL) return null;
+  return (await classifyGarments(data, mimeType)).seg;
+}
+
+export type ClassifierStatus = "used" | "skipped" | "unavailable";
+
+/**
+ * The classifier stage with its outcome (CLASSIFIER_MODE, see classifierConfig).
+ * Never throws: skip mode, a missing URL, a timeout or a bad reply all mean
+ * "score without it", and that is logged.
+ */
+export async function classifyGarments(data: Buffer, mimeType: string, config = classifierConfig()): Promise<{ seg: Segmentation | null; status: ClassifierStatus }> {
+  if (config.mode === "skip" || !config.url) {
+    console.info(`[aura] classifier skipped (CLASSIFIER_MODE=${config.mode}${config.url ? "" : ", no url"}), scoring image only`);
+    return { seg: null, status: "skipped" };
+  }
   try {
     const form = new FormData();
     form.append("image", new Blob([new Uint8Array(data)], { type: mimeType }), "frame.jpg");
-    const res = await fetch(`${ML_SERVICE_URL}/segment`, {
+    const res = await fetch(`${config.url}/segment`, {
       method: "POST",
       body: form,
-      signal: AbortSignal.timeout(ML_SERVICE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(config.timeoutMs),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const parsed = segmentationSchema.safeParse(await res.json());
     if (!parsed.success) throw parsed.error;
-    return parsed.data;
+    return { seg: parsed.data, status: "used" };
   } catch (err) {
-    console.warn(`[aura] segmenter unavailable at ${ML_SERVICE_URL}, scoring image only:`, err instanceof Error ? err.message : err);
-    return null;
+    console.warn(`[aura] classifier unavailable at ${config.url} (${config.mode}), skipped, scoring image only:`, err instanceof Error ? err.message : err);
+    return { seg: null, status: "unavailable" };
   }
 }
 

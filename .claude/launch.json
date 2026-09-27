@@ -12,6 +12,14 @@
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
       "runtimeArgs": ["scripts/dev-mock.mjs"],
       "port": 3100
+    },
+    {
+      "name": "aura-os-mobile",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["scripts/dev-mock.mjs"],
+      "env": { "AURA_DIST_DIR": ".next-mobile", "ADMIN_KEY": "mobile-test-key" },
+      "port": 3300,
+      "autoPort": true
     }
   ]
 }

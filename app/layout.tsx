@@ -25,7 +25,17 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+/** Link previews need absolute image URLs: the public origin (PUBLIC_BASE_URL) when set. */
+function metadataBase(): URL | undefined {
+  try {
+    return process.env.PUBLIC_BASE_URL ? new URL(process.env.PUBLIC_BASE_URL) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const metadata: Metadata = {
+  metadataBase: metadataBase(),
   title: "AURA OS",
   description: "AURA OS: a social outfit-battling platform. Aura Battles, 1v1 and squads, judged on fit and pose. HackGT 13.",
 };

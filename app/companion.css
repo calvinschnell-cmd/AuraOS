@@ -922,3 +922,77 @@ a.standings__row:active {
 .companion-bar--cta:active {
   transform: translate(1px, 1px);
 }
+
+/* /scan: phone scans */
+.scan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.scan__from {
+  padding: 0.5rem;
+  border: 1px solid var(--aura-glow);
+  font-size: 0.7rem;
+  text-align: center;
+}
+.scan__who {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+.scan__library {
+  width: 100%;
+  padding: 0.8rem;
+}
+.scan__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+.scan__preview {
+  max-height: 42vh;
+  max-width: 100%;
+  object-fit: contain;
+  border: 1px solid var(--aura-cyan);
+  filter: saturate(0.6);
+}
+.scan__state {
+  font-size: 0.8rem;
+  text-align: center;
+}
+.scan__bar {
+  width: 100%;
+  height: 0.6rem;
+  border: 1px solid var(--aura-cyan);
+}
+.scan__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--aura-cyan);
+  transition: width 0.4s steps(6);
+}
+.scan__error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  text-align: center;
+  line-height: 1.5;
+}
+.result-timing {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-align: center;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scan__bar > span {
+    transition: none;
+  }
+}

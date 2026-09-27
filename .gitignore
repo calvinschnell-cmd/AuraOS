@@ -57,6 +57,7 @@ ml-service/pose/data/raw/
 ml-service/pose/models/
 /.next-mock/
 /.next-demo/
+/.next-mobile/
 
 # collector logs
 ml-service/pose/data/*.log

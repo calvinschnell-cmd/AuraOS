@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { loadIdentity, saveIdentity, subscribeIdentity } from "@/lib/companion/identity";
-import { registerPlayer } from "@/lib/kiosk/api";
+import { registerPlayer } from "@/lib/companion/register";
 import type { PlayerInfo } from "@/lib/kiosk/types";
 import { historyPath, parseHandle } from "@/lib/players";
 import { checkPlayerName } from "@/lib/profanity";

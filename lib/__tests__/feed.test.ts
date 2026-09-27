@@ -68,7 +68,7 @@ describe("cards = feed", () => {
   const card = (over: Partial<NewCard>): NewCard => ({ id: crypto.randomUUID(), scanId: "scan-1", battleId: null, kind: "scan", headline: 1, target: 1, title: "T", verdict: null, caption: null, parentId: null, slot: null, ...over });
 
   it("posts every saved card to the feed (newest first), squad members nested", async () => {
-    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map() });
+    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map(), hiddenAt: new Map(), rawPhotos: new Map() });
     const first = await store.insertCard(card({ title: "FIRST" }), Buffer.from("a"));
     await new Promise((r) => setTimeout(r, 5));
     const squadCard = await store.insertCard(card({ kind: "squad", title: "SQUAD", scanId: null, battleId: "b1" }), Buffer.from("b"));
@@ -81,7 +81,7 @@ describe("cards = feed", () => {
   });
 
   it("counts one reaction per device per emoji", async () => {
-    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map() });
+    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map(), hiddenAt: new Map(), rawPhotos: new Map() });
     const c = await store.insertCard(card({}), Buffer.from("a"));
     await store.react(c.id, "🔥", "device-aaaa");
     await store.react(c.id, "🔥", "device-aaaa");
@@ -91,7 +91,7 @@ describe("cards = feed", () => {
   });
 
   it("claims a battle slot once", async () => {
-    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map() });
+    const store = new MemoryStore({ scans: [], cards: [], cardImages: new Map(), entries: [], battles: [], fits: [], players: new Map(), reactions: new Map(), hiddenAt: new Map(), rawPhotos: new Map() });
     const b = duel(null, null, 0, 1);
     await store.insertBattle(b);
     expect(await store.claimBattleSlot(b.id, 1, "SAM#K7QX")).toBe(true);

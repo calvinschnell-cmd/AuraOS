@@ -252,6 +252,15 @@ export interface LeaderboardEntry {
   handle: string | null;
   /** Their card (/r/[id]) when one was saved: the phone standings open it. */
   cardId?: string | null;
+  /** Scanned at the mirror or on a phone (/scan). Older rows: mirror. */
+  source?: ScanSource;
+}
+
+/** Where a scan was taken. */
+export type ScanSource = "mirror" | "mobile";
+
+export function isScanSource(v: unknown): v is ScanSource {
+  return v === "mirror" || v === "mobile";
 }
 
 /** Where scans live: Tiger Data (TimescaleDB) or this server's memory. */
@@ -304,6 +313,15 @@ export interface LeaderboardSnapshot {
   /** Rivalry of the Day, Squad Champion, streaks, most improved (rule-based). */
   narrative: LeaderboardNarrative;
   at: number;
+}
+
+/** JSON body returned by POST /api/scan/quick (phone scans). */
+export interface QuickScanResponse {
+  scan: Omit<ScanResult, "image" | "capturedAt">;
+  /** The garment classifier stage: used, skipped (CLASSIFIER_MODE=skip) or unavailable; null when it never ran. */
+  classifier: "used" | "skipped" | "unavailable" | null;
+  /** Server time for the whole request. */
+  ms: number;
 }
 
 export interface CardResponse {
