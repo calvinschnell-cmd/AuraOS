@@ -6,14 +6,12 @@ import { BattleHero, BattleStrip, CommentaryWindow, LobbyWindow, ModeSelectWindo
 import { BootScreen } from "./BootScreen";
 import { CameraFeed } from "./CameraFeed";
 import { DebugOverlay } from "./DebugOverlay";
-import { Footer } from "./Footer";
 import { GestureLegend } from "./GestureLegend";
 import { GestureRing } from "./GestureRing";
 import { LandmarkOverlay } from "./LandmarkOverlay";
 import { LiveGlow } from "./LiveGlow";
 import { MannequinView } from "./MannequinView";
 import { OsWindow } from "./OsWindow";
-import { PrivacyLine } from "./PrivacyLine";
 import { RevealPanel, RevealPhoto } from "./Reveal";
 import { SettingsWindow } from "./SettingsWindow";
 import {
@@ -154,11 +152,8 @@ export function DigitalLayout(p: KioskViewProps) {
             <div className="kiosk-main__foot">
               <GestureRing progressRef={p.gestures.progressRef} />
               <GestureLegend state={state} suppressed={revealing} />
-              {idle && <PrivacyLine />}
             </div>
           </main>
-
-          <Footer onReboot={p.reboot} />
         </div>
       )}
 

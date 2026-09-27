@@ -8,7 +8,6 @@ import { BattleHero, BattleStrip, CommentaryWindow, LobbyWindow, ModeSelectWindo
 import { BootScreen } from "./BootScreen";
 import { CameraFeed } from "./CameraFeed";
 import { DebugOverlay } from "./DebugOverlay";
-import { Footer } from "./Footer";
 import { GestureLegend } from "./GestureLegend";
 import { GestureRing } from "./GestureRing";
 import { LandmarkOverlay } from "./LandmarkOverlay";
@@ -171,8 +170,6 @@ export function MirrorLayout(p: KioskViewProps) {
               <GestureLegend state={state} suppressed={revealing} />
             </div>
           </main>
-
-          <Footer onReboot={p.reboot} />
         </div>
       )}
 
