@@ -276,7 +276,6 @@
 [data-mode="mirror"] .reveal-aura--negative.mirror-aura .mirror-aura__value {
   color: var(--aura-cyan);
   opacity: 0.55;
-  text-decoration: line-through;
 }
 .reveal-aura--low .reveal-aura__value {
   opacity: 0.85;
@@ -530,7 +529,7 @@
 }
 [data-mode="mirror"] .judge__aura--negative {
   color: var(--aura-cyan);
-  text-decoration: line-through;
+  opacity: 0.55;
 }
 @keyframes judges-flash-mirror {
   50% {
