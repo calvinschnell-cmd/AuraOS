@@ -14,7 +14,7 @@ import { DecodeNumber } from "./DecodeNumber";
 import { IdentityForm, useIdentity } from "./Identity";
 import { Reactions } from "./Reactions";
 
-const KIND_LABEL = { scan: "SOLO SCAN", battle: "AURA BATTLE", squad: "SQUAD BATTLE" } as const;
+const KIND_LABEL = { scan: "SOLO SCAN", battle: "AURA BATTLE", squad: "SQUAD BATTLE", challenge: "CHALLENGE" } as const;
 
 /**
  * The page a card's QR lands a friend on: that exact battle / scan full-size,
@@ -26,6 +26,8 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
   /** This phone scanned (or claimed) it: challenge a friend instead of "scan yours". */
   const [mine, setMine] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  const [challengeNote, setChallengeNote] = useState<string | null>(null);
+  const [challenging, setChallenging] = useState(false);
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/cards/${entry.id}/mine`, { headers: { "X-Device-Id": clientId() }, cache: "no-store" })
@@ -130,6 +132,36 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
     }
   }, [entry.imageUrl, entry.caption, entry.target, fileName, pageLink]);
 
+  /** Your own solo card: make (or reuse) its challenge link and send it. */
+  const challenge = useCallback(async () => {
+    setChallenging(true);
+    setChallengeNote(null);
+    try {
+      const res = await fetch("/api/duels", { method: "POST", headers: { "Content-Type": "application/json", "X-Device-Id": clientId() }, body: JSON.stringify({ cardId: entry.id }) });
+      const body = (await res.json().catch(() => null)) as { id?: string; error?: string } | null;
+      if (!res.ok || !body?.id) return setChallengeNote(body?.error ?? "COULDN'T MAKE THE CHALLENGE. TRY AGAIN.");
+      const url = `${window.location.origin}/c/${body.id}`;
+      const text = `I got ${formatAura(entry.target)} aura on AURA OS. Think you can beat me?`;
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title: "AURA OS CHALLENGE", text, url });
+          setChallengeNote(`SENT. RESULTS SHOW UP AT ${url.replace(/^https?:\/\//, "")}`);
+          return;
+        } catch (err) {
+          if (err instanceof DOMException && err.name === "AbortError") return setChallengeNote(`YOUR LINK: ${url}`);
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        setChallengeNote(`LINK COPIED: ${url}`);
+      } catch {
+        setChallengeNote(`YOUR LINK: ${url}`);
+      }
+    } finally {
+      setChallenging(false);
+    }
+  }, [entry.id, entry.target]);
+
   const copyCaption = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(`${entry.caption ?? beatThisLine(entry.target)} ${pageLink()}`);
@@ -162,7 +194,7 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
     <AppShell title={KIND_LABEL[entry.kind]} tab="feed">
         <section className="os-window os-window--dark">
           <header className="os-window__title">
-            <span>{entry.kind === "scan" ? "AURA_CARD.PNG" : entry.kind === "battle" ? "AURA_BATTLE_CARD.PNG" : "SQUAD_BATTLE_CARD.PNG"}</span>
+            <span>{entry.kind === "scan" ? "AURA_CARD.PNG" : entry.kind === "battle" ? "AURA_BATTLE_CARD.PNG" : entry.kind === "challenge" ? "CHALLENGE_RESULT.PNG" : "SQUAD_BATTLE_CARD.PNG"}</span>
             <span>x</span>
           </header>
           <div className="os-window__body companion__card">
@@ -188,8 +220,19 @@ export function ResultScreen({ detail, timingMs = null }: { detail: FeedDetail; 
           <div className="os-window__body companion__cta">
             <DecodeNumber value={entry.target} className="companion__target font-number aura-text-glow" />
             <div className="font-heading text-xs uppercase">{beatThisLine(entry.target)}</div>
-            {mine ? (
-              <p className="companion__note">THIS ONE&apos;S YOURS. SEND IT TO A FRIEND AND SEE IF THEY CAN BEAT IT.</p>
+            {mine && entry.kind === "scan" ? (
+              <>
+                <button type="button" className="companion__big-btn" disabled={challenging} onClick={() => void challenge()}>
+                  [{challenging ? "..." : "CHALLENGE A FRIEND"}]
+                </button>
+                {challengeNote ? (
+                  <p className="companion__note result-share-note">{challengeNote}</p>
+                ) : (
+                  <p className="companion__note">SEND A LINK. THEY SCAN, THE JUDGES PICK A WINNER AND ROAST IT.</p>
+                )}
+              </>
+            ) : mine ? (
+              <p className="companion__note">THIS ONE&apos;S YOURS. SHARE IT.</p>
             ) : (
               <Link href="/scan" className="companion__big-btn companion__link-btn">
                 [SCAN YOURS]

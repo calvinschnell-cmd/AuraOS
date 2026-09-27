@@ -128,6 +128,29 @@ export const TIGER_SCHEMA: readonly string[] = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
 
+  // Challenge links (/c/[id]) and each friend's accept (its battle + feed card).
+  `CREATE TABLE IF NOT EXISTS duels (
+    id text PRIMARY KEY,
+    card_id uuid NOT NULL,
+    scan_id uuid NOT NULL,
+    device_id text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS duels_card_idx ON duels (card_id)`,
+  `CREATE TABLE IF NOT EXISTS duel_accepts (
+    id uuid PRIMARY KEY,
+    duel_id text NOT NULL,
+    card_id uuid NOT NULL,
+    scan_id uuid NOT NULL,
+    battle_id uuid NOT NULL,
+    feed_card_id uuid,
+    device_id text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS duel_accepts_card_idx ON duel_accepts (duel_id, card_id)`,
+  `CREATE INDEX IF NOT EXISTS duel_accepts_duel_idx ON duel_accepts (duel_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS duel_accepts_feed_idx ON duel_accepts (feed_card_id) WHERE feed_card_id IS NOT NULL`,
+
   `CREATE TABLE IF NOT EXISTS reactions (
     card_id uuid NOT NULL,
     emoji text NOT NULL,

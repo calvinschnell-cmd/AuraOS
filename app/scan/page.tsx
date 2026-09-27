@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ScanScreen } from "@/components/companion/ScanScreen";
+import { isDuelId } from "@/lib/duels/types";
 
 export const metadata: Metadata = {
   title: "AURA OS · SCAN YOUR FIT",
@@ -8,7 +9,8 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "AURA OS · SCAN YOUR FIT", images: ["/api/og"] },
 };
 
-/** Phone scans: take or pick a photo, get scored, land on your card's page. */
-export default function ScanPage() {
-  return <ScanScreen />;
+/** Phone scans: take or pick a photo, get scored, land on your card's page (or, with ?c=, battle a challenge). */
+export default async function ScanPage({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
+  const { c } = await searchParams;
+  return <ScanScreen challengeId={c && isDuelId(c) ? c : null} />;
 }

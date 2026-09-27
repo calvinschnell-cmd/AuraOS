@@ -9,6 +9,7 @@ import { NEAR_ZERO_MAX, type JudgeId, type ScoreBreakdown } from "@/lib/scoring"
 import type { BattleRecord } from "@/lib/battle/types";
 import { REACTIONS, type FeedEntry } from "@/lib/feed/types";
 import type { CardKind } from "@/lib/share/caption";
+import type { Duel, DuelAccept } from "@/lib/duels/types";
 import { dayKey, dayStart } from "./day";
 import { TigerStore, getTigerPool } from "./tigerStore";
 
@@ -83,7 +84,7 @@ export interface ViewerBest {
 }
 
 /** Feed row for a card (reactions filled in by the store). */
-export function feedEntryOf(card: StoredCard, reactions: Record<string, number>, handle: string | null = null): FeedEntry {
+export function feedEntryOf(card: StoredCard, reactions: Record<string, number>, handle: string | null = null, challengeId: string | null = null): FeedEntry {
   return {
     id: card.id,
     kind: card.kind,
@@ -99,6 +100,7 @@ export function feedEntryOf(card: StoredCard, reactions: Record<string, number>,
     slot: card.slot,
     source: card.source,
     handle,
+    challengeId,
     reactions,
   };
 }
@@ -179,6 +181,14 @@ export interface ScanStore {
   /** Every leaderboard entry of these players, oldest first ("most improved" deltas). */
   entriesForHandles(handles: string[]): Promise<LeaderboardEntry[]>;
 
+  /** Challenge links: one per card (reused when the owner shares it again). */
+  createDuel(duel: Omit<Duel, "createdAt">): Promise<Duel>;
+  getDuel(id: string): Promise<Duel | null>;
+  duelForCard(cardId: string): Promise<Duel | null>;
+  addDuelAccept(accept: Omit<DuelAccept, "createdAt">): Promise<DuelAccept>;
+  /** Newest first. */
+  duelAccepts(duelId: string): Promise<DuelAccept[]>;
+
   recentFitSignatures(limit: number): Promise<string[][]>;
   insertFit(signature: string[], seed: string): Promise<void>;
 
@@ -248,6 +258,8 @@ interface MemoryState {
   /** cardId -> when an admin hid it. */
   hiddenAt: Map<string, string>;
   rawPhotos: Map<string, { data: Buffer; mimeType: string }>;
+  duels?: Duel[];
+  duelAccepts?: DuelAccept[];
 }
 
 type MemoryEntry = LeaderboardEntry & { deviceId?: string | null; hidden?: boolean };
@@ -424,6 +436,31 @@ export class MemoryStore implements ScanStore {
       .map((b) => structuredClone(b));
   }
 
+  async createDuel(duel: Omit<Duel, "createdAt">) {
+    const existing = await this.duelForCard(duel.cardId);
+    if (existing) return existing;
+    const d: Duel = { ...duel, createdAt: new Date().toISOString() };
+    (this.s.duels ??= []).push(d);
+    return d;
+  }
+  async getDuel(id: string) {
+    return this.s.duels?.find((d) => d.id === id) ?? null;
+  }
+  async duelForCard(cardId: string) {
+    return this.s.duels?.find((d) => d.cardId === cardId) ?? null;
+  }
+  async addDuelAccept(accept: Omit<DuelAccept, "createdAt">) {
+    const a: DuelAccept = { ...accept, createdAt: new Date().toISOString() };
+    (this.s.duelAccepts ??= []).push(a);
+    return a;
+  }
+  async duelAccepts(duelId: string) {
+    return (this.s.duelAccepts ?? []).filter((a) => a.duelId === duelId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  private challengeOf(card: StoredCard): string | null {
+    if (card.kind !== "challenge") return null;
+    return this.s.duelAccepts?.find((a) => a.feedCardId === card.id)?.duelId ?? null;
+  }
   private handleOf(card: StoredCard): string | null {
     if (!card.scanId || card.battleId) return null;
     return this.s.entries.find((e) => e.scanId === card.scanId)?.handle ?? null;
@@ -438,7 +475,7 @@ export class MemoryStore implements ScanStore {
       .filter((c) => c.parentId === null && !c.hidden && (!before || c.createdAt < before) && (!since || c.createdAt > since))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit)
-      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c)));
+      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c), this.challengeOf(c)));
   }
   async cardsForHandle(handle: string, limit: number) {
     const h = handle.toUpperCase();
@@ -455,17 +492,17 @@ export class MemoryStore implements ScanStore {
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit)
-      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c)));
+      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c), this.challengeOf(c)));
   }
   async feedEntry(cardId: string) {
     const c = this.s.cards.find((x) => x.id === cardId && !x.hidden);
-    return c ? feedEntryOf(c, this.counts(c.id), this.handleOf(c)) : null;
+    return c ? feedEntryOf(c, this.counts(c.id), this.handleOf(c), this.challengeOf(c)) : null;
   }
   async childCards(parentId: string) {
     return this.s.cards
       .filter((c) => c.parentId === parentId && !c.hidden)
       .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
-      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c)));
+      .map((c) => feedEntryOf(c, this.counts(c.id), this.handleOf(c), this.challengeOf(c)));
   }
   async react(cardId: string, emoji: string, clientId: string) {
     let byEmoji = this.s.reactions.get(cardId);

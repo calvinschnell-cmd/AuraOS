@@ -8,6 +8,7 @@ import { dayStart } from "./day";
 import type { BattleOutcome } from "@/lib/battle/types";
 import type { FeedEntry } from "@/lib/feed/types";
 import type { CardKind } from "@/lib/share/caption";
+import type { Duel, DuelAccept } from "@/lib/duels/types";
 import { emptyReactions, feedEntryOf, type NewCard, type NewLeaderboardEntry, type ScanStore, type StoredBattle, type StoredCard, type StoredScan } from "./store";
 import { TIGER_SCHEMA } from "./tigerSchema";
 import { TIMESCALE_CA_PEM } from "./timescaleCa";
@@ -121,7 +122,7 @@ const toCard = (r: CardRow): StoredCard => ({
   imageUrl: `/api/cards/${r.id}/image`,
   createdAt: r.created_at.toISOString(),
   nftSignature: r.nft_signature,
-  kind: (["scan", "battle", "squad"].includes(r.kind) ? r.kind : r.battle_id ? "battle" : "scan") as CardKind,
+  kind: (["scan", "battle", "squad", "challenge"].includes(r.kind) ? r.kind : r.battle_id ? "battle" : "scan") as CardKind,
   headline: r.headline,
   target: r.target,
   title: r.title,
@@ -140,6 +141,25 @@ interface BattleRow {
   commentary: string | null;
   created_at: Date;
 }
+
+interface DuelRow {
+  id: string;
+  card_id: string;
+  scan_id: string;
+  device_id: string;
+  created_at: Date;
+}
+interface AcceptRow {
+  id: string;
+  duel_id: string;
+  card_id: string;
+  scan_id: string;
+  battle_id: string;
+  feed_card_id: string | null;
+  device_id: string;
+  created_at: Date;
+}
+const toDuel = (r: DuelRow): Duel => ({ id: r.id, cardId: r.card_id, scanId: r.scan_id, deviceId: r.device_id, createdAt: r.created_at.toISOString() });
 
 const SCAN_COLS = "id, image_hash, aura, analysis, breakdown, created_at, source";
 const ENTRY_COLS = "id, scan_id, handle, nickname, aura, standout, created_at, source";
@@ -418,13 +438,21 @@ export class TigerStore implements ScanStore {
   }
   private async toFeed(rows: CardRow[]): Promise<FeedEntry[]> {
     const solo = rows.filter((r) => r.scan_id && !r.battle_id).map((r) => r.scan_id!);
-    const [counts, handles] = await Promise.all([
+    const challenges = rows.filter((r) => r.kind === "challenge").map((r) => r.id);
+    const [counts, handles, duelIds] = await Promise.all([
       this.reactionCounts(rows.map((r) => r.id)),
       solo.length
         ? (await this.db()).query<{ scan_id: string; handle: string | null }>(`SELECT scan_id, handle FROM leaderboard_entries WHERE scan_id = ANY($1::uuid[])`, [solo]).then((q) => new Map(q.rows.map((h) => [h.scan_id, h.handle])))
         : Promise.resolve(new Map<string, string | null>()),
+      challenges.length
+        ? (await this.db())
+            .query<{ feed_card_id: string; duel_id: string }>(`SELECT feed_card_id, duel_id FROM duel_accepts WHERE feed_card_id = ANY($1::uuid[])`, [challenges])
+            .then((q) => new Map(q.rows.map((d) => [d.feed_card_id, d.duel_id])))
+        : Promise.resolve(new Map<string, string>()),
     ]);
-    return rows.map((r) => feedEntryOf(toCard(r), counts.get(r.id) ?? emptyReactions(), (r.scan_id && !r.battle_id ? handles.get(r.scan_id) : null) ?? null));
+    return rows.map((r) =>
+      feedEntryOf(toCard(r), counts.get(r.id) ?? emptyReactions(), (r.scan_id && !r.battle_id ? handles.get(r.scan_id) : null) ?? null, duelIds.get(r.id) ?? null),
+    );
   }
   async feed(limit: number, before?: string | null, since?: string | null) {
     const { rows } = await (await this.db()).query<CardRow>(
@@ -471,6 +499,37 @@ export class TigerStore implements ScanStore {
     const { rows } = await (await this.db()).query<EntryRow>(`SELECT ${ENTRY_COLS} FROM leaderboard_entries WHERE NOT hidden AND handle = ANY($1::text[]) ORDER BY created_at ASC`, [handles]);
     return rows.map(toEntry);
   }
+  // ---------------------------------------------------------------- challenge links
+
+  async createDuel(duel: Omit<Duel, "createdAt">) {
+    const db = await this.db();
+    await db.query(`INSERT INTO duels (id, card_id, scan_id, device_id) VALUES ($1, $2, $3, $4) ON CONFLICT (card_id) DO NOTHING`, [duel.id, duel.cardId, duel.scanId, duel.deviceId]);
+    return (await this.duelForCard(duel.cardId))!;
+  }
+  async getDuel(id: string) {
+    const { rows } = await (await this.db()).query<DuelRow>(`SELECT id, card_id, scan_id, device_id, created_at FROM duels WHERE id = $1`, [id]);
+    return rows[0] ? toDuel(rows[0]) : null;
+  }
+  async duelForCard(cardId: string) {
+    if (!isUuid(cardId)) return null;
+    const { rows } = await (await this.db()).query<DuelRow>(`SELECT id, card_id, scan_id, device_id, created_at FROM duels WHERE card_id = $1`, [cardId]);
+    return rows[0] ? toDuel(rows[0]) : null;
+  }
+  async addDuelAccept(a: Omit<DuelAccept, "createdAt">) {
+    const { rows } = await (await this.db()).query<{ created_at: Date }>(
+      `INSERT INTO duel_accepts (id, duel_id, card_id, scan_id, battle_id, feed_card_id, device_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING created_at`,
+      [a.id, a.duelId, a.cardId, a.scanId, a.battleId, a.feedCardId, a.deviceId],
+    );
+    return { ...a, createdAt: rows[0].created_at.toISOString() };
+  }
+  async duelAccepts(duelId: string) {
+    const { rows } = await (await this.db()).query<AcceptRow>(
+      `SELECT id, duel_id, card_id, scan_id, battle_id, feed_card_id, device_id, created_at FROM duel_accepts WHERE duel_id = $1 ORDER BY created_at DESC LIMIT 200`,
+      [duelId],
+    );
+    return rows.map((r) => ({ id: r.id, duelId: r.duel_id, cardId: r.card_id, scanId: r.scan_id, battleId: r.battle_id, feedCardId: r.feed_card_id, deviceId: r.device_id, createdAt: r.created_at.toISOString() }));
+  }
+
   async recentFitSignatures(limit: number) {
     const { rows } = await (await this.db()).query<{ signature: string }>(`SELECT signature FROM fit_history ORDER BY created_at DESC LIMIT $1`, [limit]);
     return rows.reverse().map((r) => r.signature.split("|"));

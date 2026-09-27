@@ -11,7 +11,7 @@ import { getScanStore } from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
 
-const KIND_CHIP = { scan: "SOLO", battle: "1V1", squad: "SQUAD" } as const;
+const KIND_CHIP = { scan: "SOLO", battle: "1V1", squad: "SQUAD", challenge: "CHALLENGE" } as const;
 const MAX_CARDS = 60;
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: KIOSK_TIMEZONE });

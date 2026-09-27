@@ -8,7 +8,8 @@ import { formatAura } from "@/lib/scoring";
  * Rule-based on purpose (cheap, instant, never off-brand).
  */
 
-export type CardKind = "scan" | "battle" | "squad";
+/** "challenge": an async battle from a challenge link (/c/[id]), made on the server. */
+export type CardKind = "scan" | "battle" | "squad" | "challenge";
 
 export interface CaptionInput {
   kind: CardKind;

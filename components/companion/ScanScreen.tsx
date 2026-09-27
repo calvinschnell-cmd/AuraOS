@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShareCardView, type ShareCardProps } from "@/components/card/ShareCardView";
@@ -18,6 +19,7 @@ type Step =
   | { kind: "uploading"; progress: number }
   | { kind: "scoring" }
   | { kind: "card" }
+  | { kind: "battle" }
   | { kind: "error"; message: string; retry: boolean };
 
 const SCORING_LINES = ["READING THE FIT", "CONSULTING THE JUDGES", "COUNTING AURA POINTS", "CHECKING THE DRIP"];
@@ -28,9 +30,10 @@ const SCORING_LINES = ["READING THE FIT", "CONSULTING THE JUDGES", "COUNTING AUR
  * server (/api/scan/quick) → render the same share card the mirror makes
  * (face blurred) → post it (feed + board) → its result page (/r/[id]).
  * Every step survives bad venue wifi: the photo and the score are kept, and
- * RETRY resumes from the step that failed.
+ * RETRY resumes from the step that failed. From a challenge link
+ * (/scan?c=[id]) the new card then accepts the challenge and lands on /c/[id].
  */
-export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
+export function ScanScreen({ challengeId = null }: { challengeId?: string | null }) {
   const router = useRouter();
   const [player, setPlayer] = useIdentity();
   const [switching, setSwitching] = useState(false);
@@ -38,10 +41,14 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
   const [line, setLine] = useState(0);
   const [cardProps, setCardProps] = useState<ShareCardProps | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  /** Shown on a refused challenge: the card itself was saved. */
+  const [savedCard, setSavedCard] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const photoRef = useRef<PreparedPhoto | null>(null);
   const scanRef = useRef<ScanResult | null>(null);
   const cardIdRef = useRef<string | null>(null);
+  /** The card is saved: only the last step (open it, or accept the challenge) is left. */
+  const cardSavedRef = useRef(false);
   const startRef = useRef(0);
   const cameraInput = useRef<HTMLInputElement | null>(null);
   const libraryInput = useRef<HTMLInputElement | null>(null);
@@ -54,6 +61,34 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
   }, [step.kind]);
 
   const fail = useCallback((message: string, retry = true) => setStep({ kind: "error", message, retry }), []);
+
+  /** Step 4: open the card, or battle the challenger with it. */
+  const finish = useCallback(async () => {
+    const id = cardIdRef.current;
+    if (!id) return;
+    const ms = Date.now() - startRef.current;
+    if (!challengeId) {
+      router.push(`/r/${id}?t=${ms}`);
+      return;
+    }
+    setStep({ kind: "battle" });
+    try {
+      const res = await fetch(`/api/duels/${encodeURIComponent(challengeId)}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Device-Id": clientId() },
+        body: JSON.stringify({ cardId: id }),
+      });
+      const body = (await res.json().catch(() => null)) as { acceptId?: string; error?: string } | null;
+      if (!res.ok || !body?.acceptId) {
+        // Your card is saved either way: a refused challenge (your own link, taken down) still leaves your result.
+        const retryable = res.status >= 500;
+        return fail(body?.error ?? "THE BATTLE TRIPPED. TRY AGAIN.", retryable);
+      }
+      router.push(`/c/${encodeURIComponent(challengeId)}?a=${body.acceptId}`);
+    } catch {
+      fail("CONNECTION DROPPED. YOUR CARD IS SAVED: RETRY TO BATTLE.");
+    }
+  }, [challengeId, router, fail]);
 
   /** Step 3: render the card offscreen, upload it, open its page. */
   const makeCard = useCallback(async () => {
@@ -83,13 +118,15 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
       const body = (await res.json().catch(() => null)) as (CardResponse & { error?: string }) | null;
       // 409: a retry after the first upload actually landed.
       if (!res.ok && res.status !== 409) throw new Error(body?.error ?? "CARD COULD NOT BE SAVED.");
-      const ms = Date.now() - startRef.current;
-      router.push(`/r/${id}?t=${ms}`);
+      cardSavedRef.current = true;
+      setSavedCard(id);
     } catch (err) {
       console.warn("[aura] phone card failed", err);
       fail(err instanceof Error && err.message === err.message.toUpperCase() ? err.message : "COULDN'T SAVE YOUR CARD. WIFI?");
+      return;
     }
-  }, [player, router, fail]);
+    await finish();
+  }, [player, fail, finish]);
 
   /** Step 2: upload + score. */
   const upload = useCallback(async () => {
@@ -120,6 +157,8 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
       photoRef.current = null;
       scanRef.current = null;
       cardIdRef.current = null;
+      cardSavedRef.current = false;
+      setSavedCard(null);
       setCardProps(null);
       setStep({ kind: "preparing" });
       try {
@@ -134,7 +173,8 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
   );
 
   const retry = () => {
-    if (scanRef.current) void makeCard();
+    if (cardSavedRef.current) void finish();
+    else if (scanRef.current) void makeCard();
     else if (photoRef.current) void upload();
     else setStep({ kind: "pick" });
   };
@@ -150,7 +190,11 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
           <span>x</span>
         </header>
         <div className="os-window__body scan">
-          {startedFrom && <p className="scan__from font-heading">CHALLENGE ACCEPTED. SCAN YOUR FIT TO BATTLE.</p>}
+          {challengeId && (
+            <p className="scan__from font-heading">
+              CHALLENGE ACCEPTED. SCAN YOUR FIT TO BATTLE. <Link href={`/c/${encodeURIComponent(challengeId)}`}>[BACK]</Link>
+            </p>
+          )}
           {needsName ? (
             <>
               <p className="companion__note">FIRST: WHAT DO WE CALL YOU? THIS PHONE REMEMBERS IT.</p>
@@ -196,12 +240,13 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
                     {step.kind === "uploading" && `UPLOADING ${Math.round(step.progress * 100)}%`}
                     {step.kind === "scoring" && SCORING_LINES[line % SCORING_LINES.length]}
                     {step.kind === "card" && "PRINTING YOUR CARD"}
+                    {step.kind === "battle" && "BATTLING THE CHALLENGER"}
                     <span className="analyzing__dots" />
                   </div>
                   <div className="scan__bar" aria-hidden>
                     <span
                       style={{
-                        width: `${step.kind === "preparing" ? 5 : step.kind === "uploading" ? 5 + step.progress * 30 : step.kind === "scoring" ? 70 : 92}%`,
+                        width: `${step.kind === "preparing" ? 5 : step.kind === "uploading" ? 5 + step.progress * 30 : step.kind === "scoring" ? 70 : step.kind === "card" ? 85 : 95}%`,
                       }}
                     />
                   </div>
@@ -216,6 +261,11 @@ export function ScanScreen({ startedFrom }: { startedFrom?: string | null }) {
                       [RETRY]
                     </button>
                   ) : null}
+                  {savedCard && challengeId && (
+                    <Link href={`/r/${savedCard}`} className="card-page__button">
+                      [SEE YOUR CARD]
+                    </Link>
+                  )}
                   <button type="button" className="card-page__button" onClick={() => setStep({ kind: "pick" })}>
                     [PICK ANOTHER PHOTO]
                   </button>
