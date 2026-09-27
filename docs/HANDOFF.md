@@ -102,8 +102,9 @@ No music or voice on any phone page. Phone pages load no Three.js / MediaPipe (`
 - Music: `lib/kiosk/music.ts`, mirror only. A quiet background loop
   (`public/audio/kiosk-bg.flac`, loops 0:00 → 1:22 of a 1:32 track) and a result
   jingle (`public/audio/result-jingle.flac`, 2.4 s). **These files are
-  third-party game music and are gitignored**: they exist only on the kiosk
-  laptop, never on GitHub or the public server (which returns 404 for them).
+  third-party game music, committed to git so a fresh laptop clone has them,
+  but `export-ignore`d**: the deploy never ships them to the public server
+  (which returns 404 for them).
   Without the files the kiosk is silent and falls back to the old hit/sad sounds.
 - Nothing overlaps: the loop fades out whenever the voice queue is busy, during
   CHARGING / COUNTDOWN / ANALYZING / LOBBY_COUNTDOWN / BATTLE_INTRO, and during
@@ -119,7 +120,7 @@ No music or voice on any phone page. Phone pages load no Three.js / MediaPipe (`
 - Loop points are editable: `/music-lab` has LOOP START / LOOP END (slider,
   seconds, ±0.1 s, SET = PLAYHEAD, click the bar to seek), HEAR THE SEAM,
   PAUSE / RESUME, and SAVE (ADMIN_KEY) / REVERT / DEFAULT. Saved to
-  `public/audio/loop.json` on the laptop (gitignored) via `/api/music-loop`;
+  `public/audio/loop.json` (in git; commit it after changing the loop) via `/api/music-loop`;
   the mirror re-reads it every 30 s (`MusicEngine.refreshLoop`), no reload. A
   start after 0:00 = the intro plays once, then [start, end) repeats. Validation
   in `lib/kiosk/musicLoop.ts` (start < end, ≥ 1 s apart).
@@ -130,7 +131,7 @@ No music or voice on any phone page. Phone pages load no Three.js / MediaPipe (`
   (jingle → "Your aura is…" → reaction → verdict), so nothing overlaps; the loop
   stays ducked through it. Clips come from `/api/sfx/[name]`: generated once
   with the ElevenLabs sound-effects API and saved to
-  `public/audio/reactions/*.mp3` (gitignored; all five were generated on the
+  `public/audio/reactions/*.mp3` (in git, not deployed; all five were generated on the
   laptop on 2026-09-26). Without a key or clips (MOCK MODE) each reaction is
   synthesized in Web Audio. They play through the effects master: MUTE ALL and
   volume apply, MUTE MUSIC / MUTE VOICE don't. Solo scans only (not battles).
